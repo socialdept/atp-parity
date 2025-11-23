@@ -1,0 +1,41 @@
+{
+    "name": "socialdept/atp-parity",
+    "description": ":package_description",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Author Name",
+            "email": "author@email.com",
+            "homepage": "http://author.com"
+        }
+    ],
+    "homepage": "https://github.com/socialdept/atp-parity",
+    "keywords": ["Laravel", "AtpReplicator"],
+    "require": {
+        "illuminate/support": "~9"
+    },
+    "require-dev": {
+        "../../../vendor/phpunit/phpunit": "~9.0",
+        "orchestra/testbench": "~7"
+    },
+    "autoload": {
+        "psr-4": {
+            "SocialDept\\AtpReplicator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SocialDept\\AtpReplicator\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SocialDept\\AtpReplicator\\AtpReplicatorServiceProvider"
+            ],
+            "aliases": {
+                "AtpReplicator": "SocialDept\\AtpReplicator\\Facades\\AtpReplicator"
+            }
+        }
+    }
+}
