@@ -24,7 +24,7 @@ class ExportService
      */
     public function downloadRepo(string $did, ?string $since = null): RepoExport
     {
-        $response = Atp::atproto->sync->getRepo($did, $since);
+        $response = Atp::public()->atproto->sync->getRepo($did, $since);
         $carData = $response->body();
 
         return new RepoExport(
@@ -92,7 +92,7 @@ class ExportService
         $cursor = null;
 
         do {
-            $response = Atp::atproto->sync->listBlobs(
+            $response = Atp::public()->atproto->sync->listBlobs(
                 did: $did,
                 since: $since,
                 limit: 500,
@@ -112,7 +112,7 @@ class ExportService
      */
     public function downloadBlob(string $did, string $cid): string
     {
-        $response = Atp::atproto->sync->getBlob($did, $cid);
+        $response = Atp::public()->atproto->sync->getBlob($did, $cid);
 
         return $response->body();
     }
@@ -122,7 +122,7 @@ class ExportService
      */
     public function getLatestCommit(string $did): array
     {
-        $commit = Atp::atproto->sync->getLatestCommit($did);
+        $commit = Atp::public()->atproto->sync->getLatestCommit($did);
 
         return [
             'cid' => $commit->cid,
@@ -135,7 +135,7 @@ class ExportService
      */
     public function getRepoStatus(string $did): array
     {
-        $status = Atp::atproto->sync->getRepoStatus($did);
+        $status = Atp::public()->atproto->sync->getRepoStatus($did);
 
         return $status->toArray();
     }
