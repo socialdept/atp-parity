@@ -57,7 +57,6 @@ class PublishService
 
             $client = Atp::as($did);
             $response = $client->atproto->repo->createRecord(
-                repo: $did,
                 collection: $collection,
                 record: $record->toArray(),
             );
@@ -101,7 +100,6 @@ class PublishService
 
             $client = Atp::as($parts['did']);
             $response = $client->atproto->repo->putRecord(
-                repo: $parts['did'],
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
                 record: $record->toArray(),
@@ -138,7 +136,6 @@ class PublishService
         try {
             $client = Atp::as($parts['did']);
             $client->atproto->repo->deleteRecord(
-                repo: $parts['did'],
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
             );
