@@ -1,5 +1,8 @@
 <?php
 
+use SocialDept\AtpParity\Enums\BlobStorageDriver;
+use SocialDept\AtpParity\Enums\BlobUrlStrategy;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -101,5 +104,61 @@ return [
     'discovery' => [
         // Relay URL for discovery queries
         'relay' => env('ATP_RELAY_URL', 'https://bsky.network'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Blob Handling
+    |--------------------------------------------------------------------------
+    |
+    | Settings for downloading and uploading AT Protocol blobs.
+    |
+    */
+    'blobs' => [
+        // Storage driver: 'filesystem' or 'medialibrary'
+        // - filesystem: Uses Laravel filesystem + parity_blob_mappings table
+        // - medialibrary: Uses Spatie MediaLibrary (no extra migrations needed)
+        'storage_driver' => BlobStorageDriver::tryFrom(
+            env('PARITY_BLOB_STORAGE', 'filesystem')
+        ) ?? BlobStorageDriver::Filesystem,
+
+        // Automatically download blobs when importing records
+        'download_on_import' => env('PARITY_BLOB_DOWNLOAD', false),
+
+        // Laravel filesystem disk for storing blobs (filesystem driver only)
+        'disk' => env('PARITY_BLOB_DISK', 'local'),
+
+        // Base path within the disk (filesystem driver only)
+        'path' => 'atp-blobs',
+
+        // Maximum blob size to download (bytes)
+        'max_download_size' => 10 * 1024 * 1024, // 10MB
+
+        // URL generation strategy (used when blobs aren't stored locally)
+        'url_strategy' => BlobUrlStrategy::tryFrom(
+            env('PARITY_BLOB_URL_STRATEGY', 'cdn')
+        ) ?? BlobUrlStrategy::Cdn,
+
+        // CDN base URL (for Bluesky)
+        'cdn_url' => 'https://cdn.bsky.app',
+
+        // Database table for blob mappings (filesystem driver only)
+        'table' => 'parity_blob_mappings',
+
+        // MediaLibrary collection prefix for ATP blobs (medialibrary driver only)
+        'media_collection_prefix' => 'atp_',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Generator Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configure paths for the make:atp-mapper command.
+    | Paths are relative to the application base path.
+    |
+    */
+    'generators' => [
+        'mapper_path' => 'app/AtpMappers',
     ],
 ];

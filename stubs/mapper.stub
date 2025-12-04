@@ -1,0 +1,36 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpParity\RecordMapper;
+use SocialDept\AtpSchema\Data\Data;
+
+class {{ class }} extends RecordMapper
+{
+    public function recordClass(): string
+    {
+        return {{ record }}::class;
+    }
+
+    public function modelClass(): string
+    {
+        return {{ model }}::class;
+    }
+
+    protected function recordToAttributes(Data $record): array
+    {
+        return [
+            // Map record properties to model attributes
+            // 'content' => $record->text,
+        ];
+    }
+
+    protected function modelToRecordData(Model $model): array
+    {
+        return [
+            // Map model attributes to record properties
+            // 'text' => $model->content,
+        ];
+    }
+}
