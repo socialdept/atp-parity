@@ -4,6 +4,7 @@ namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
+use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
 
 /**
@@ -150,5 +151,83 @@ abstract class RecordMapper implements RecordMapperContract
         }
 
         return $attributes;
+    }
+
+    /**
+     * Define blob fields in the record.
+     * Override to specify which fields contain blobs.
+     *
+     * @return array<string, array{type: 'single'|'array', path?: string}>
+     */
+    public function blobFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * Extract blob references from a record.
+     *
+     * @return array<BlobReference>
+     */
+    public function extractBlobs(Data $record): array
+    {
+        $blobs = [];
+        $fields = $this->blobFields();
+
+        if (empty($fields)) {
+            return $blobs;
+        }
+
+        $recordData = $record->toArray();
+
+        foreach ($fields as $field => $config) {
+            $path = $config['path'] ?? $field;
+            $value = data_get($recordData, $path);
+
+            if ($config['type'] === 'array' && is_array($value)) {
+                foreach ($value as $item) {
+                    if ($ref = $this->toBlobReference($item)) {
+                        $blobs[] = $ref;
+                    }
+                }
+            } elseif ($ref = $this->toBlobReference($value)) {
+                $blobs[] = $ref;
+            }
+        }
+
+        return $blobs;
+    }
+
+    /**
+     * Convert array data to BlobReference.
+     */
+    protected function toBlobReference(mixed $data): ?BlobReference
+    {
+        if ($data instanceof BlobReference) {
+            return $data;
+        }
+
+        if (is_array($data) && isset($data['$type']) && $data['$type'] === 'blob') {
+            return BlobReference::fromArray($data);
+        }
+
+        // Handle nested blob format (e.g., image.blob)
+        if (is_array($data) && isset($data['ref'])) {
+            return new BlobReference(
+                ref: is_array($data['ref']) ? ($data['ref']['$link'] ?? $data['ref']) : $data['ref'],
+                mimeType: $data['mimeType'] ?? 'application/octet-stream',
+                size: $data['size'] ?? 0
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if this mapper has blob fields defined.
+     */
+    public function hasBlobFields(): bool
+    {
+        return ! empty($this->blobFields());
     }
 }
