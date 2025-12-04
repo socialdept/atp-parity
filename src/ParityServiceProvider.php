@@ -7,6 +7,7 @@ use SocialDept\AtpParity\Commands\DiscoverCommand;
 use SocialDept\AtpParity\Commands\ExportCommand;
 use SocialDept\AtpParity\Commands\ImportCommand;
 use SocialDept\AtpParity\Commands\ImportStatusCommand;
+use SocialDept\AtpParity\Commands\MakeMapperCommand;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
@@ -79,11 +80,16 @@ class ParityServiceProvider extends ServiceProvider
             __DIR__.'/../database/migrations' => database_path('migrations'),
         ], 'parity-migrations');
 
+        $this->publishes([
+            __DIR__.'/../stubs/mapper.stub' => base_path('stubs/atp-mapper.stub'),
+        ], 'parity-stubs');
+
         $this->commands([
             DiscoverCommand::class,
             ExportCommand::class,
             ImportCommand::class,
             ImportStatusCommand::class,
+            MakeMapperCommand::class,
         ]);
     }
 

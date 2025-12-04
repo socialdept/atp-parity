@@ -102,4 +102,17 @@ return [
         // Relay URL for discovery queries
         'relay' => env('ATP_RELAY_URL', 'https://bsky.network'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Generator Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configure paths for the make:atp-mapper command.
+    | Paths are relative to the application base path.
+    |
+    */
+    'generators' => [
+        'mapper_path' => 'app/AtpMappers',
+    ],
 ];
