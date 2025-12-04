@@ -29,7 +29,7 @@ class DiscoveryService
         $count = 0;
 
         do {
-            $response = Atp::atproto->sync->listReposByCollection(
+            $response = Atp::public()->atproto->sync->listReposByCollection(
                 collection: $collection,
                 limit: min(500, $limit ? $limit - $count : 500),
                 cursor: $cursor,
