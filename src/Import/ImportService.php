@@ -4,6 +4,9 @@ namespace SocialDept\AtpParity\Import;
 
 use SocialDept\AtpClient\AtpClient;
 use SocialDept\AtpClient\Facades\Atp;
+use SocialDept\AtpParity\Blob\BlobManager;
+use SocialDept\AtpParity\Concerns\HasAtpBlobs;
+use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Events\ImportCompleted;
 use SocialDept\AtpParity\Events\ImportFailed;
 use SocialDept\AtpParity\Events\ImportProgress;
@@ -88,6 +91,13 @@ class ImportService
         $pageDelay = config('parity.import.page_delay', 100);
         $recordClass = $mapper->recordClass();
 
+        // Blob downloads during import only work in Filesystem mode
+        // In MediaLibrary mode, models must handle blob downloads via syncAtpBlobsToMedia()
+        $storageDriver = config('parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
+        $downloadBlobs = config('parity.blobs.download_on_import', false)
+            && $storageDriver === BlobStorageDriver::Filesystem;
+        $blobManager = $downloadBlobs ? app(BlobManager::class) : null;
+
         try {
             do {
                 $response = $client->atproto->repo->listRecords(
@@ -105,10 +115,18 @@ class ImportService
                     try {
                         $record = $recordClass::fromArray($item['value']);
 
-                        $mapper->upsert($record, [
+                        $model = $mapper->upsert($record, [
                             'uri' => $item['uri'],
                             'cid' => $item['cid'],
                         ]);
+
+                        // Download blobs if enabled and mapper has blob fields
+                        if ($blobManager && $mapper->hasBlobFields()) {
+                            $blobs = $mapper->extractBlobs($record);
+                            if (! empty($blobs)) {
+                                $blobManager->downloadMany($blobs, $did);
+                            }
+                        }
 
                         $synced++;
                     } catch (Throwable $e) {
