@@ -3,15 +3,20 @@
 namespace SocialDept\AtpParity;
 
 use Illuminate\Support\ServiceProvider;
+use SocialDept\AtpParity\Blob\BlobDownloader;
+use SocialDept\AtpParity\Blob\BlobManager;
+use SocialDept\AtpParity\Blob\BlobUploader;
 use SocialDept\AtpParity\Commands\DiscoverCommand;
 use SocialDept\AtpParity\Commands\ExportCommand;
 use SocialDept\AtpParity\Commands\ImportCommand;
 use SocialDept\AtpParity\Commands\ImportStatusCommand;
 use SocialDept\AtpParity\Commands\MakeMapperCommand;
+use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
 use SocialDept\AtpParity\Publish\PublishService;
+use SocialDept\AtpParity\Storage\FilesystemBlobStorage;
 use SocialDept\AtpParity\Support\RecordHelper;
 
 class ParityServiceProvider extends ServiceProvider
@@ -52,6 +57,37 @@ class ParityServiceProvider extends ServiceProvider
             return new ExportService(
                 $app->make(MapperRegistry::class),
                 $app->make(ImportService::class)
+            );
+        });
+
+        $this->registerBlobServices();
+    }
+
+    /**
+     * Register blob-related services.
+     */
+    protected function registerBlobServices(): void
+    {
+        $this->app->singleton(BlobStorage::class, function () {
+            return new FilesystemBlobStorage(
+                config('parity.blobs.disk'),
+                config('parity.blobs.path', 'atp-blobs')
+            );
+        });
+
+        $this->app->singleton(BlobDownloader::class, function ($app) {
+            return new BlobDownloader($app->make(BlobStorage::class));
+        });
+
+        $this->app->singleton(BlobUploader::class, function ($app) {
+            return new BlobUploader($app->make(BlobStorage::class));
+        });
+
+        $this->app->singleton(BlobManager::class, function ($app) {
+            return new BlobManager(
+                $app->make(BlobStorage::class),
+                $app->make(BlobDownloader::class),
+                $app->make(BlobUploader::class)
             );
         });
     }
@@ -103,6 +139,10 @@ class ParityServiceProvider extends ServiceProvider
             PublishService::class,
             DiscoveryService::class,
             ExportService::class,
+            BlobStorage::class,
+            BlobDownloader::class,
+            BlobUploader::class,
+            BlobManager::class,
         ];
     }
 }
