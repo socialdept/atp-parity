@@ -1,6 +1,6 @@
 {
     "name": "socialdept/atp-parity",
-    "description": ":package_description",
+    "description": "AT Protocol record mapping and sync for Laravel Eloquent models",
     "license": "MIT",
     "authors": [
         {
@@ -10,31 +10,37 @@
         }
     ],
     "homepage": "https://github.com/socialdept/atp-parity",
-    "keywords": ["Laravel", "AtpReplicator"],
+    "keywords": ["Laravel", "AT Protocol", "Bluesky", "ATP", "Parity", "Sync"],
     "require": {
-        "illuminate/support": "~9"
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0",
+        "socialdept/atp-schema": "^0.3",
+        "socialdept/atp-client": "^0.0",
+        "socialdept/atp-resolver": "^1.1",
+        "socialdept/atp-signals": "^1.1"
     },
     "require-dev": {
-        "../../../vendor/phpunit/phpunit": "~9.0",
-        "orchestra/testbench": "~7"
+        "phpunit/phpunit": "^10.0|^11.0",
+        "orchestra/testbench": "^8.0|^9.0|^10.0"
     },
     "autoload": {
         "psr-4": {
-            "SocialDept\\AtpReplicator\\": "src/"
+            "SocialDept\\AtpParity\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "SocialDept\\AtpReplicator\\Tests\\": "tests"
+            "SocialDept\\AtpParity\\Tests\\": "tests"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "SocialDept\\AtpReplicator\\AtpReplicatorServiceProvider"
+                "SocialDept\\AtpParity\\ParityServiceProvider"
             ],
             "aliases": {
-                "AtpReplicator": "SocialDept\\AtpReplicator\\Facades\\AtpReplicator"
+                "Parity": "SocialDept\\AtpParity\\Facades\\Parity"
             }
         }
     }
