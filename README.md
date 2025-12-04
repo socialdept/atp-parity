@@ -28,6 +28,7 @@ Think of it as Laravel's model casts, but for AT Protocol records.
 - **Type-safe DTOs** - Full integration with atp-schema generated types
 - **Model traits** - Add AT Protocol awareness to any Eloquent model
 - **Flexible mappers** - Define custom transformations for your domain
+- **Blob handling** - Download, upload, and serve images and videos
 
 ## Quick Example
 
@@ -243,6 +244,7 @@ For detailed documentation on specific topics:
 
 - [Record Mappers](docs/mappers.md) - Creating and using mappers
 - [Model Traits](docs/traits.md) - HasAtpRecord and SyncsWithAtp
+- [Blob Handling](docs/blobs.md) - Downloading, uploading, and serving blobs
 - [atp-schema Integration](docs/atp-schema-integration.md) - Using generated DTOs
 - [atp-client Integration](docs/atp-client-integration.md) - RecordHelper and fetching
 - [atp-signals Integration](docs/atp-signals-integration.md) - ParitySignal and firehose sync
@@ -314,6 +316,39 @@ $post->markAsSynced($uri, $cid);
 $post->updateFromRecord($record, $uri, $cid);
 ```
 
+### HasAtpBlobs
+
+Add blob handling to models with images or other binary content:
+
+```php
+use SocialDept\AtpParity\Concerns\HasAtpRecord;
+use SocialDept\AtpParity\Concerns\HasAtpBlobs;
+
+class Post extends Model
+{
+    use HasAtpRecord, HasAtpBlobs;
+
+    protected $casts = ['atp_blobs' => 'array'];
+}
+```
+
+Available methods:
+
+```php
+// Get URLs for blobs
+$url = $post->getAtpBlobUrl('avatar');     // Single blob URL
+$urls = $post->getAtpBlobUrls('images');   // Array of URLs
+
+// Download blobs locally
+$post->downloadAtpBlobs();
+
+// Check status
+$post->hasAtpBlobs();      // Has any blob data
+$post->hasLocalBlobs();    // All blobs downloaded locally
+```
+
+See [Blob Handling](docs/blobs.md) for complete documentation including MediaLibrary integration.
+
 ## Database Migration
 
 Add AT Protocol columns to your models:
@@ -323,8 +358,18 @@ Schema::table('posts', function (Blueprint $table) {
     $table->string('atp_uri')->nullable()->unique();
     $table->string('atp_cid')->nullable();
     $table->timestamp('atp_synced_at')->nullable(); // For SyncsWithAtp
+    $table->json('atp_blobs')->nullable();          // For HasAtpBlobs
 });
 ```
+
+Publish and run Parity's migrations for import state tracking and blob mappings:
+
+```bash
+php artisan vendor:publish --tag=parity-migrations
+php artisan migrate
+```
+
+**Note:** The `parity_blob_mappings` migration is only required if using the `filesystem` storage driver. If using `medialibrary` mode, you can skip this migration.
 
 ## Configuration
 
@@ -341,6 +386,15 @@ return [
     'columns' => [
         'uri' => 'atp_uri',
         'cid' => 'atp_cid',
+    ],
+
+    // Blob handling configuration
+    'blobs' => [
+        // 'filesystem' (requires migrations) or 'medialibrary' (no extra migrations)
+        'storage_driver' => \SocialDept\AtpParity\Enums\BlobStorageDriver::Filesystem,
+        'download_on_import' => env('PARITY_BLOB_DOWNLOAD', false),
+        'disk' => env('PARITY_BLOB_DISK', 'local'),
+        'url_strategy' => \SocialDept\AtpParity\Enums\BlobUrlStrategy::Cdn,
     ],
 ];
 ```
