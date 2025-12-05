@@ -15,7 +15,7 @@ use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
-use SocialDept\AtpParity\Publish\PublishService;
+use SocialDept\AtpParity\Sync\SyncService;
 use SocialDept\AtpParity\Storage\FilesystemBlobStorage;
 use SocialDept\AtpParity\Support\RecordHelper;
 
@@ -45,8 +45,8 @@ class ParityServiceProvider extends ServiceProvider
             return new ImportService($app->make(MapperRegistry::class));
         });
 
-        $this->app->singleton(PublishService::class, function ($app) {
-            return new PublishService($app->make(MapperRegistry::class));
+        $this->app->singleton(SyncService::class, function ($app) {
+            return new SyncService($app->make(MapperRegistry::class));
         });
 
         $this->app->singleton(DiscoveryService::class, function ($app) {
@@ -136,7 +136,7 @@ class ParityServiceProvider extends ServiceProvider
             MapperRegistry::class,
             RecordHelper::class,
             ImportService::class,
-            PublishService::class,
+            SyncService::class,
             DiscoveryService::class,
             ExportService::class,
             BlobStorage::class,

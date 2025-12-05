@@ -1,54 +1,54 @@
 <?php
 
-namespace SocialDept\AtpParity\Publish;
+namespace SocialDept\AtpParity\Sync;
 
 use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpClient\Facades\Atp;
-use SocialDept\AtpParity\Events\RecordPublished;
-use SocialDept\AtpParity\Events\RecordUnpublished;
+use SocialDept\AtpParity\Events\RecordSynced;
+use SocialDept\AtpParity\Events\RecordUnsynced;
 use SocialDept\AtpParity\MapperRegistry;
 use Throwable;
 
 /**
- * Service for publishing Eloquent models to AT Protocol.
+ * Service for syncing Eloquent models to AT Protocol.
  */
-class PublishService
+class SyncService
 {
     public function __construct(
         protected MapperRegistry $registry
     ) {}
 
     /**
-     * Publish a model as a new record to AT Protocol.
+     * Sync a model as a new record to AT Protocol.
      *
      * Requires the model to have a DID association (via did column or relationship).
      */
-    public function publish(Model $model): PublishResult
+    public function sync(Model $model): SyncResult
     {
         $did = $this->getDidFromModel($model);
 
         if (! $did) {
-            return PublishResult::failed('No DID associated with model. Use publishAs() to specify a DID.');
+            return SyncResult::failed('No DID associated with model. Use syncAs() to specify a DID.');
         }
 
-        return $this->publishAs($did, $model);
+        return $this->syncAs($did, $model);
     }
 
     /**
-     * Publish a model as a specific user.
+     * Sync a model as a specific user.
      */
-    public function publishAs(string $did, Model $model): PublishResult
+    public function syncAs(string $did, Model $model): SyncResult
     {
         $mapper = $this->registry->forModel(get_class($model));
 
         if (! $mapper) {
-            return PublishResult::failed('No mapper registered for model: '.get_class($model));
+            return SyncResult::failed('No mapper registered for model: '.get_class($model));
         }
 
-        // Check if already published
+        // Check if already synced
         $existingUri = $this->getModelUri($model);
         if ($existingUri) {
-            return $this->update($model);
+            return $this->resync($model);
         }
 
         try {
@@ -59,41 +59,41 @@ class PublishService
             $response = $client->atproto->repo->createRecord(
                 collection: $collection,
                 record: $record->toArray(),
-                validate: config('parity.publish.validate', true),
+                validate: config('parity.sync.validate', true),
             );
 
             // Update model with ATP metadata
             $this->updateModelMeta($model, $response->uri, $response->cid);
 
-            event(new RecordPublished($model, $response->uri, $response->cid));
+            event(new RecordSynced($model, $response->uri, $response->cid));
 
-            return PublishResult::success($response->uri, $response->cid);
+            return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
-            return PublishResult::failed($e->getMessage());
+            return SyncResult::failed($e->getMessage());
         }
     }
 
     /**
-     * Update an existing published record.
+     * Resync an existing synced record.
      */
-    public function update(Model $model): PublishResult
+    public function resync(Model $model): SyncResult
     {
         $uri = $this->getModelUri($model);
 
         if (! $uri) {
-            return PublishResult::failed('Model has not been published yet. Use publish() first.');
+            return SyncResult::failed('Model has not been synced yet. Use sync() first.');
         }
 
         $mapper = $this->registry->forModel(get_class($model));
 
         if (! $mapper) {
-            return PublishResult::failed('No mapper registered for model: '.get_class($model));
+            return SyncResult::failed('No mapper registered for model: '.get_class($model));
         }
 
         $parts = $this->parseUri($uri);
 
         if (! $parts) {
-            return PublishResult::failed('Invalid AT Protocol URI: '.$uri);
+            return SyncResult::failed('Invalid AT Protocol URI: '.$uri);
         }
 
         try {
@@ -104,24 +104,24 @@ class PublishService
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
                 record: $record->toArray(),
-                validate: config('parity.publish.validate', true),
+                validate: config('parity.sync.validate', true),
             );
 
             // Update model with new CID
             $this->updateModelMeta($model, $response->uri, $response->cid);
 
-            event(new RecordPublished($model, $response->uri, $response->cid));
+            event(new RecordSynced($model, $response->uri, $response->cid));
 
-            return PublishResult::success($response->uri, $response->cid);
+            return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
-            return PublishResult::failed($e->getMessage());
+            return SyncResult::failed($e->getMessage());
         }
     }
 
     /**
-     * Delete a published record from AT Protocol.
+     * Unsync (delete) a record from AT Protocol.
      */
-    public function delete(Model $model): bool
+    public function unsync(Model $model): bool
     {
         $uri = $this->getModelUri($model);
 
@@ -145,7 +145,7 @@ class PublishService
             // Clear ATP metadata from model
             $this->clearModelMeta($model);
 
-            event(new RecordUnpublished($model, $uri));
+            event(new RecordUnsynced($model, $uri));
 
             return true;
         } catch (Throwable $e) {

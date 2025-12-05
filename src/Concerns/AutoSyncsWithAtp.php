@@ -2,7 +2,7 @@
 
 namespace SocialDept\AtpParity\Concerns;
 
-use SocialDept\AtpParity\Publish\PublishService;
+use SocialDept\AtpParity\Sync\SyncService;
 
 /**
  * Trait for Eloquent models that automatically sync with AT Protocol.
@@ -17,7 +17,7 @@ use SocialDept\AtpParity\Publish\PublishService;
  */
 trait AutoSyncsWithAtp
 {
-    use PublishesRecords;
+    use SyncsRecords;
 
     /**
      * Boot the AutoSyncsWithAtp trait.
@@ -28,20 +28,20 @@ trait AutoSyncsWithAtp
             if ($model->shouldAutoSync()) {
                 $did = $model->syncAsDid();
                 if ($did) {
-                    app(PublishService::class)->publishAs($did, $model);
+                    app(SyncService::class)->syncAs($did, $model);
                 }
             }
         });
 
         static::updated(function ($model) {
-            if ($model->isPublished() && $model->shouldAutoSync()) {
-                app(PublishService::class)->update($model);
+            if ($model->isSynced() && $model->shouldAutoSync()) {
+                app(SyncService::class)->resync($model);
             }
         });
 
         static::deleted(function ($model) {
-            if ($model->isPublished() && $model->shouldAutoUnsync()) {
-                app(PublishService::class)->delete($model);
+            if ($model->isSynced() && $model->shouldAutoUnsync()) {
+                app(SyncService::class)->unsync($model);
             }
         });
     }
