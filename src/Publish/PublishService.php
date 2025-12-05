@@ -59,6 +59,7 @@ class PublishService
             $response = $client->atproto->repo->createRecord(
                 collection: $collection,
                 record: $record->toArray(),
+                validate: config('parity.publish.validate', true),
             );
 
             // Update model with ATP metadata
@@ -103,6 +104,7 @@ class PublishService
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
                 record: $record->toArray(),
+                validate: config('parity.publish.validate', true),
             );
 
             // Update model with new CID

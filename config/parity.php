@@ -151,6 +151,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Publishing Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Settings for publishing records to AT Protocol.
+    |
+    */
+    'publish' => [
+        // Validate records against lexicon schemas on the PDS
+        // Set to false to allow custom lexicons on PDSes that don't have them
+        'validate' => env('PARITY_PUBLISH_VALIDATE', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Generator Settings
     |--------------------------------------------------------------------------
     |
