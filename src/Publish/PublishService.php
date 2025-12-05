@@ -206,7 +206,7 @@ class PublishService
 
         $model->{$uriColumn} = $uri;
         $model->{$cidColumn} = $cid;
-        $model->save();
+        $model->saveQuietly();
     }
 
     /**
@@ -219,7 +219,7 @@ class PublishService
 
         $model->{$uriColumn} = null;
         $model->{$cidColumn} = null;
-        $model->save();
+        $model->saveQuietly();
     }
 
     /**
