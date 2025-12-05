@@ -1,20 +1,20 @@
 <?php
 
-namespace SocialDept\AtpParity\Tests\Unit\Publish;
+namespace SocialDept\AtpParity\Tests\Unit\Sync;
 
 use Illuminate\Support\Facades\Event;
 use Mockery;
-use SocialDept\AtpParity\Events\RecordPublished;
-use SocialDept\AtpParity\Events\RecordUnpublished;
+use SocialDept\AtpParity\Events\RecordSynced;
+use SocialDept\AtpParity\Events\RecordUnsynced;
 use SocialDept\AtpParity\MapperRegistry;
-use SocialDept\AtpParity\Publish\PublishService;
+use SocialDept\AtpParity\Sync\SyncService;
 use SocialDept\AtpParity\Tests\Fixtures\TestMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestModel;
 use SocialDept\AtpParity\Tests\TestCase;
 
-class PublishServiceTest extends TestCase
+class SyncServiceTest extends TestCase
 {
-    private PublishService $service;
+    private SyncService $service;
 
     private MapperRegistry $registry;
 
@@ -25,22 +25,22 @@ class PublishServiceTest extends TestCase
         $this->registry = new MapperRegistry();
         $this->registry->register(new TestMapper());
 
-        $this->service = new PublishService($this->registry);
+        $this->service = new SyncService($this->registry);
 
         Event::fake();
     }
 
-    public function test_publish_fails_when_no_did_available(): void
+    public function test_sync_fails_when_no_did_available(): void
     {
         $model = new TestModel(['content' => 'Test']);
 
-        $result = $this->service->publish($model);
+        $result = $this->service->sync($model);
 
         $this->assertTrue($result->isFailed());
         $this->assertStringContainsString('No DID', $result->error);
     }
 
-    public function test_publish_uses_did_from_model_column(): void
+    public function test_sync_uses_did_from_model_column(): void
     {
         $model = new TestModel([
             'content' => 'Test',
@@ -49,50 +49,50 @@ class PublishServiceTest extends TestCase
 
         $this->mockAtpClient('did:plc:test123', 'at://did:plc:test123/app.test.record/abc', 'cid123');
 
-        $result = $this->service->publish($model);
+        $result = $this->service->sync($model);
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame('at://did:plc:test123/app.test.record/abc', $result->uri);
     }
 
-    public function test_publish_as_creates_record_with_specified_did(): void
+    public function test_sync_as_creates_record_with_specified_did(): void
     {
         $model = new TestModel(['content' => 'Hello world']);
 
         $this->mockAtpClient('did:plc:specified', 'at://did:plc:specified/app.test.record/xyz', 'newcid');
 
-        $result = $this->service->publishAs('did:plc:specified', $model);
+        $result = $this->service->syncAs('did:plc:specified', $model);
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame('at://did:plc:specified/app.test.record/xyz', $result->uri);
         $this->assertSame('newcid', $result->cid);
     }
 
-    public function test_publish_as_updates_model_metadata(): void
+    public function test_sync_as_updates_model_metadata(): void
     {
         $model = TestModel::create(['content' => 'Test']);
 
         $this->mockAtpClient('did:plc:test', 'at://did:plc:test/app.test.record/rkey', 'cid');
 
-        $this->service->publishAs('did:plc:test', $model);
+        $this->service->syncAs('did:plc:test', $model);
 
         $model->refresh();
         $this->assertSame('at://did:plc:test/app.test.record/rkey', $model->atp_uri);
         $this->assertSame('cid', $model->atp_cid);
     }
 
-    public function test_publish_dispatches_record_published_event(): void
+    public function test_sync_dispatches_record_synced_event(): void
     {
         $model = new TestModel(['content' => 'Test', 'did' => 'did:plc:test']);
 
         $this->mockAtpClient('did:plc:test', 'at://did/col/rkey', 'cid');
 
-        $this->service->publish($model);
+        $this->service->sync($model);
 
-        Event::assertDispatched(RecordPublished::class);
+        Event::assertDispatched(RecordSynced::class);
     }
 
-    public function test_publish_redirects_to_update_when_already_published(): void
+    public function test_sync_redirects_to_resync_when_already_synced(): void
     {
         $model = TestModel::create([
             'content' => 'Existing',
@@ -102,22 +102,22 @@ class PublishServiceTest extends TestCase
 
         $this->mockAtpClientForUpdate('did:plc:test', 'at://did:plc:test/app.test.record/existing', 'newcid');
 
-        $result = $this->service->publishAs('did:plc:test', $model);
+        $result = $this->service->syncAs('did:plc:test', $model);
 
         $this->assertTrue($result->isSuccess());
     }
 
-    public function test_update_fails_when_not_published(): void
+    public function test_resync_fails_when_not_synced(): void
     {
-        $model = new TestModel(['content' => 'Not published']);
+        $model = new TestModel(['content' => 'Not synced']);
 
-        $result = $this->service->update($model);
+        $result = $this->service->resync($model);
 
         $this->assertTrue($result->isFailed());
-        $this->assertStringContainsString('not been published', $result->error);
+        $this->assertStringContainsString('not been synced', $result->error);
     }
 
-    public function test_update_calls_put_record(): void
+    public function test_resync_calls_put_record(): void
     {
         $model = TestModel::create([
             'content' => 'Updated content',
@@ -127,13 +127,13 @@ class PublishServiceTest extends TestCase
 
         $this->mockAtpClientForUpdate('did:plc:test', 'at://did:plc:test/app.test.record/rkey123', 'updatedcid');
 
-        $result = $this->service->update($model);
+        $result = $this->service->resync($model);
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame('updatedcid', $result->cid);
     }
 
-    public function test_delete_removes_record_and_clears_metadata(): void
+    public function test_unsync_removes_record_and_clears_metadata(): void
     {
         $model = TestModel::create([
             'content' => 'To delete',
@@ -143,7 +143,7 @@ class PublishServiceTest extends TestCase
 
         $this->mockAtpClientForDelete('did:plc:test');
 
-        $result = $this->service->delete($model);
+        $result = $this->service->unsync($model);
 
         $this->assertTrue($result);
 
@@ -152,7 +152,7 @@ class PublishServiceTest extends TestCase
         $this->assertNull($model->atp_cid);
     }
 
-    public function test_delete_dispatches_record_unpublished_event(): void
+    public function test_unsync_dispatches_record_unsynced_event(): void
     {
         $model = TestModel::create([
             'content' => 'To delete',
@@ -162,40 +162,40 @@ class PublishServiceTest extends TestCase
 
         $this->mockAtpClientForDelete('did:plc:test');
 
-        $this->service->delete($model);
+        $this->service->unsync($model);
 
-        Event::assertDispatched(RecordUnpublished::class);
+        Event::assertDispatched(RecordUnsynced::class);
     }
 
-    public function test_delete_returns_false_when_not_published(): void
+    public function test_unsync_returns_false_when_not_synced(): void
     {
-        $model = new TestModel(['content' => 'Not published']);
+        $model = new TestModel(['content' => 'Not synced']);
 
-        $result = $this->service->delete($model);
+        $result = $this->service->unsync($model);
 
         $this->assertFalse($result);
     }
 
-    public function test_publish_handles_exception_gracefully(): void
+    public function test_sync_handles_exception_gracefully(): void
     {
         $model = new TestModel(['content' => 'Test', 'did' => 'did:plc:test']);
 
         $this->mockAtpClientWithException('did:plc:test', 'API error occurred');
 
-        $result = $this->service->publish($model);
+        $result = $this->service->sync($model);
 
         $this->assertTrue($result->isFailed());
         $this->assertSame('API error occurred', $result->error);
     }
 
-    public function test_update_fails_for_invalid_uri(): void
+    public function test_resync_fails_for_invalid_uri(): void
     {
         $model = new TestModel([
             'content' => 'Test',
             'atp_uri' => 'invalid-uri-format',
         ]);
 
-        $result = $this->service->update($model);
+        $result = $this->service->resync($model);
 
         $this->assertTrue($result->isFailed());
         $this->assertStringContainsString('Invalid AT Protocol URI', $result->error);

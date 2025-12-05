@@ -1,11 +1,11 @@
 <?php
 
-namespace SocialDept\AtpParity\Publish;
+namespace SocialDept\AtpParity\Sync;
 
 /**
- * Immutable value object representing the result of a publish operation.
+ * Immutable value object representing the result of a sync operation.
  */
-readonly class PublishResult
+readonly class SyncResult
 {
     public function __construct(
         public bool $success,
@@ -15,7 +15,7 @@ readonly class PublishResult
     ) {}
 
     /**
-     * Check if the publish operation succeeded.
+     * Check if the sync operation succeeded.
      */
     public function isSuccess(): bool
     {
@@ -23,7 +23,7 @@ readonly class PublishResult
     }
 
     /**
-     * Check if the publish operation failed.
+     * Check if the sync operation failed.
      */
     public function isFailed(): bool
     {

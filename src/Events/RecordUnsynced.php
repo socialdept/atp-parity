@@ -6,15 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * Dispatched when a model is published to AT Protocol.
+ * Dispatched when a model is unsynced from AT Protocol.
  */
-class RecordPublished
+class RecordUnsynced
 {
     use Dispatchable;
 
     public function __construct(
         public readonly Model $model,
         public readonly string $uri,
-        public readonly string $cid,
     ) {}
 }

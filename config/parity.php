@@ -56,13 +56,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Sync Filtering
+    | Sync Configuration
     |--------------------------------------------------------------------------
     |
-    | Control which firehose events get synced to your database.
+    | Settings for syncing records to AT Protocol and filtering firehose events.
     |
     */
     'sync' => [
+        // Validate records against lexicon schemas on the PDS
+        // Set to false to allow custom lexicons on PDSes that don't have them
+        'validate' => env('PARITY_SYNC_VALIDATE', true),
+
         // Only sync records from these DIDs (null = all DIDs)
         'dids' => null,
 
@@ -147,20 +151,6 @@ return [
 
         // MediaLibrary collection prefix for ATP blobs (medialibrary driver only)
         'media_collection_prefix' => 'atp_',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Publishing Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Settings for publishing records to AT Protocol.
-    |
-    */
-    'publish' => [
-        // Validate records against lexicon schemas on the PDS
-        // Set to false to allow custom lexicons on PDSes that don't have them
-        'validate' => env('PARITY_PUBLISH_VALIDATE', true),
     ],
 
     /*

@@ -1,15 +1,15 @@
 <?php
 
-namespace SocialDept\AtpParity\Tests\Unit\Publish;
+namespace SocialDept\AtpParity\Tests\Unit\Sync;
 
-use SocialDept\AtpParity\Publish\PublishResult;
+use SocialDept\AtpParity\Sync\SyncResult;
 use SocialDept\AtpParity\Tests\TestCase;
 
-class PublishResultTest extends TestCase
+class SyncResultTest extends TestCase
 {
     public function test_success_creates_successful_result(): void
     {
-        $result = PublishResult::success(
+        $result = SyncResult::success(
             uri: 'at://did:plc:test/app.bsky.feed.post/abc123',
             cid: 'bafyreiabc123'
         );
@@ -23,7 +23,7 @@ class PublishResultTest extends TestCase
 
     public function test_failed_creates_failed_result(): void
     {
-        $result = PublishResult::failed('Authentication required');
+        $result = SyncResult::failed('Authentication required');
 
         $this->assertFalse($result->isSuccess());
         $this->assertTrue($result->isFailed());
@@ -34,8 +34,8 @@ class PublishResultTest extends TestCase
 
     public function test_is_success_returns_correct_boolean(): void
     {
-        $success = new PublishResult(success: true);
-        $failure = new PublishResult(success: false);
+        $success = new SyncResult(success: true);
+        $failure = new SyncResult(success: false);
 
         $this->assertTrue($success->isSuccess());
         $this->assertFalse($failure->isSuccess());
@@ -43,8 +43,8 @@ class PublishResultTest extends TestCase
 
     public function test_is_failed_returns_correct_boolean(): void
     {
-        $success = new PublishResult(success: true);
-        $failure = new PublishResult(success: false);
+        $success = new SyncResult(success: true);
+        $failure = new SyncResult(success: false);
 
         $this->assertFalse($success->isFailed());
         $this->assertTrue($failure->isFailed());
@@ -52,7 +52,7 @@ class PublishResultTest extends TestCase
 
     public function test_success_result_properties_are_accessible(): void
     {
-        $result = PublishResult::success('at://did/col/rkey', 'cid123');
+        $result = SyncResult::success('at://did/col/rkey', 'cid123');
 
         $this->assertTrue($result->success);
         $this->assertSame('at://did/col/rkey', $result->uri);
@@ -61,7 +61,7 @@ class PublishResultTest extends TestCase
 
     public function test_failed_result_error_is_accessible(): void
     {
-        $result = PublishResult::failed('Something went wrong');
+        $result = SyncResult::failed('Something went wrong');
 
         $this->assertFalse($result->success);
         $this->assertSame('Something went wrong', $result->error);
