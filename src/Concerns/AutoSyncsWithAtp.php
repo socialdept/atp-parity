@@ -5,70 +5,73 @@ namespace SocialDept\AtpParity\Concerns;
 use SocialDept\AtpParity\Publish\PublishService;
 
 /**
- * Trait for Eloquent models that automatically publish to AT Protocol.
+ * Trait for Eloquent models that automatically sync with AT Protocol.
  *
- * This trait sets up model observers to automatically publish, update,
- * and unpublish records when the model is created, updated, or deleted.
+ * This trait sets up model observers to automatically create, update,
+ * and delete records when the model is created, updated, or deleted.
  *
- * Override shouldAutoPublish() and shouldAutoUnpublish() to customize
- * the conditions under which auto-publishing occurs.
+ * Override shouldAutoSync() and shouldAutoUnsync() to customize
+ * the conditions under which auto-syncing occurs.
  *
  * @mixin \Illuminate\Database\Eloquent\Model
  */
-trait AutoPublish
+trait AutoSyncsWithAtp
 {
     use PublishesRecords;
 
     /**
-     * Boot the AutoPublish trait.
+     * Boot the AutoSyncsWithAtp trait.
      */
-    public static function bootAutoPublish(): void
+    public static function bootAutoSyncsWithAtp(): void
     {
         static::created(function ($model) {
-            if ($model->shouldAutoPublish()) {
-                app(PublishService::class)->publish($model);
+            if ($model->shouldAutoSync()) {
+                $did = $model->syncAsDid();
+                if ($did) {
+                    app(PublishService::class)->publishAs($did, $model);
+                }
             }
         });
 
         static::updated(function ($model) {
-            if ($model->isPublished() && $model->shouldAutoPublish()) {
+            if ($model->isPublished() && $model->shouldAutoSync()) {
                 app(PublishService::class)->update($model);
             }
         });
 
         static::deleted(function ($model) {
-            if ($model->isPublished() && $model->shouldAutoUnpublish()) {
+            if ($model->isPublished() && $model->shouldAutoUnsync()) {
                 app(PublishService::class)->delete($model);
             }
         });
     }
 
     /**
-     * Determine if the model should be auto-published.
+     * Determine if the model should be auto-synced.
      *
      * Override this method to add custom conditions.
      */
-    public function shouldAutoPublish(): bool
+    public function shouldAutoSync(): bool
     {
         return true;
     }
 
     /**
-     * Determine if the model should be auto-unpublished when deleted.
+     * Determine if the model should be auto-unsynced when deleted.
      *
      * Override this method to add custom conditions.
      */
-    public function shouldAutoUnpublish(): bool
+    public function shouldAutoUnsync(): bool
     {
         return true;
     }
 
     /**
-     * Get the DID to use for auto-publishing.
+     * Get the DID to use for syncing.
      *
      * Override this method to customize DID resolution.
      */
-    public function getAutoPublishDid(): ?string
+    public function syncAsDid(): ?string
     {
         // Check for did column
         if (isset($this->did)) {
