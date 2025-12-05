@@ -30,6 +30,7 @@ return [
     'columns' => [
         'uri' => 'atp_uri',
         'cid' => 'atp_cid',
+        'synced_at' => 'atp_synced_at',
     ],
 
     /*
@@ -64,7 +65,7 @@ return [
     */
     'sync' => [
         // Validate records against lexicon schemas on the PDS
-        // Set to false to allow custom lexicons on PDSes that don't have them
+        // Set to `false` to allow custom lexicons on PDSes that don't have them
         'validate' => env('PARITY_SYNC_VALIDATE', true),
 
         // Only sync records from these DIDs (null = all DIDs)
@@ -74,7 +75,7 @@ return [
         'operations' => null,
 
         // Custom filter callback: function(SignalEvent $event): bool
-        // Return true to sync the event, false to skip it
+        // Return true to sync the event, `false` to skip it
         'filter' => null,
     ],
 

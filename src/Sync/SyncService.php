@@ -203,9 +203,11 @@ class SyncService
     {
         $uriColumn = config('parity.columns.uri', 'atp_uri');
         $cidColumn = config('parity.columns.cid', 'atp_cid');
+        $syncedAtColumn = config('parity.columns.synced_at', 'atp_synced_at');
 
         $model->{$uriColumn} = $uri;
         $model->{$cidColumn} = $cid;
+        $model->{$syncedAtColumn} = now();
         $model->saveQuietly();
     }
 
@@ -216,9 +218,11 @@ class SyncService
     {
         $uriColumn = config('parity.columns.uri', 'atp_uri');
         $cidColumn = config('parity.columns.cid', 'atp_cid');
+        $syncedAtColumn = config('parity.columns.synced_at', 'atp_synced_at');
 
         $model->{$uriColumn} = null;
         $model->{$cidColumn} = null;
+        $model->{$syncedAtColumn} = null;
         $model->saveQuietly();
     }
 

@@ -73,6 +73,14 @@ abstract class RecordMapper implements RecordMapperContract
         return config('parity.columns.cid', 'atp_cid');
     }
 
+    /**
+     * Get the column name for storing the sync timestamp.
+     */
+    protected function syncedAtColumn(): string
+    {
+        return config('parity.columns.synced_at', 'atp_synced_at');
+    }
+
     public function toModel(Data $record, array $meta = []): Model
     {
         $modelClass = $this->modelClass();
@@ -149,6 +157,9 @@ abstract class RecordMapper implements RecordMapperContract
         if (isset($meta['cid'])) {
             $attributes[$this->cidColumn()] = $meta['cid'];
         }
+
+        // Always set synced_at when applying meta
+        $attributes[$this->syncedAtColumn()] = now();
 
         return $attributes;
     }
