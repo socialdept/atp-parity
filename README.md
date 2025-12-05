@@ -244,6 +244,7 @@ For detailed documentation on specific topics:
 
 - [Record Mappers](docs/mappers.md) - Creating and using mappers
 - [Model Traits](docs/traits.md) - HasAtpRecord and SyncsWithAtp
+- [Automatic Syncing](docs/auto-sync.md) - Auto-sync models with AT Protocol
 - [Blob Handling](docs/blobs.md) - Downloading, uploading, and serving blobs
 - [atp-schema Integration](docs/atp-schema-integration.md) - Using generated DTOs
 - [atp-client Integration](docs/atp-client-integration.md) - RecordHelper and fetching
@@ -348,6 +349,39 @@ $post->hasLocalBlobs();    // All blobs downloaded locally
 ```
 
 See [Blob Handling](docs/blobs.md) for complete documentation including MediaLibrary integration.
+
+### AutoSyncsWithAtp
+
+Automatically sync models with AT Protocol on create, update, and delete:
+
+```php
+use SocialDept\AtpParity\Concerns\AutoSyncsWithAtp;
+
+class Post extends Model
+{
+    use AutoSyncsWithAtp;
+
+    public function syncAsDid(): ?string
+    {
+        return $this->user->did;
+    }
+
+    public function shouldAutoSync(): bool
+    {
+        return $this->status === 'published';
+    }
+}
+```
+
+When enabled, the model automatically syncs:
+
+```php
+$post = Post::create(['content' => 'Hello!']);  // Syncs to ATP
+$post->update(['content' => 'Updated']);         // Updates ATP record
+$post->delete();                                  // Removes from ATP
+```
+
+See [Automatic Syncing](docs/auto-sync.md) for complete documentation.
 
 ## Database Migration
 
