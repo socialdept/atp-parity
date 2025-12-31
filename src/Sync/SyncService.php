@@ -3,6 +3,8 @@
 namespace SocialDept\AtpParity\Sync;
 
 use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpClient\Exceptions\AuthenticationException;
+use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
 use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\RecordUnsynced;
@@ -69,6 +71,10 @@ class SyncService
 
             return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
+            if (! $this->shouldCatchException($e)) {
+                throw $e;
+            }
+
             return SyncResult::failed($e->getMessage());
         }
     }
@@ -114,6 +120,10 @@ class SyncService
 
             return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
+            if (! $this->shouldCatchException($e)) {
+                throw $e;
+            }
+
             return SyncResult::failed($e->getMessage());
         }
     }
@@ -149,6 +159,10 @@ class SyncService
 
             return true;
         } catch (Throwable $e) {
+            if (! $this->shouldCatchException($e)) {
+                throw $e;
+            }
+
             return false;
         }
     }
@@ -242,5 +256,27 @@ class SyncService
             'collection' => $matches[2],
             'rkey' => $matches[3],
         ];
+    }
+
+    /**
+     * Determine if the exception should be caught and converted to a failed result.
+     *
+     * Override this method to customize which exceptions propagate vs. are caught.
+     * By default, authentication-related exceptions are propagated to allow
+     * the application to handle re-authentication flows.
+     */
+    protected function shouldCatchException(Throwable $e): bool
+    {
+        // Authentication exceptions should propagate so the app can handle reauth
+        if ($e instanceof OAuthSessionInvalidException) {
+            return false;
+        }
+
+        if ($e instanceof AuthenticationException) {
+            return false;
+        }
+
+        // All other exceptions are caught and converted to failed results
+        return true;
     }
 }
