@@ -115,9 +115,14 @@ trait HasReferenceRecord
     public function getReferenceMapper(): ?ReferenceMapper
     {
         $registry = app(MapperRegistry::class);
-        $mapper = $registry->forModel(static::class);
 
-        return $mapper instanceof ReferenceMapper ? $mapper : null;
+        foreach ($registry->forModelAll(static::class) as $mapper) {
+            if ($mapper instanceof ReferenceMapper) {
+                return $mapper;
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace SocialDept\AtpParity\Concerns;
 
 use SocialDept\AtpParity\Contracts\RecordMapper;
+use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -99,11 +100,20 @@ trait HasAtpRecord
     }
 
     /**
-     * Get the mapper for this model.
+     * Get the main (non-reference) mapper for this model.
      */
     public function getAtpMapper(): ?RecordMapper
     {
-        return app(MapperRegistry::class)->forModel(static::class);
+        $registry = app(MapperRegistry::class);
+
+        foreach ($registry->forModelAll(static::class) as $mapper) {
+            if (! $mapper instanceof ReferenceMapper) {
+                return $mapper;
+            }
+        }
+
+        // Fallback to first mapper if all are reference mappers
+        return $registry->forModel(static::class);
     }
 
     /**

@@ -3,9 +3,12 @@
 namespace SocialDept\AtpParity\Tests\Unit;
 
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Tests\Fixtures\ReferenceModel;
+use SocialDept\AtpParity\Tests\Fixtures\TestMainMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestModel;
 use SocialDept\AtpParity\Tests\Fixtures\TestRecord;
+use SocialDept\AtpParity\Tests\Fixtures\TestReferenceMapper;
 use SocialDept\AtpParity\Tests\TestCase;
 
 class MapperRegistryTest extends TestCase
@@ -93,7 +96,7 @@ class MapperRegistryTest extends TestCase
         $this->assertEmpty($this->registry->all());
     }
 
-    public function test_registering_same_mapper_twice_overwrites(): void
+    public function test_registering_same_mapper_twice_stores_both_by_model(): void
     {
         $mapper1 = new TestMapper();
         $mapper2 = new TestMapper();
@@ -101,7 +104,45 @@ class MapperRegistryTest extends TestCase
         $this->registry->register($mapper1);
         $this->registry->register($mapper2);
 
+        // forModel returns first registered
+        $this->assertSame($mapper1, $this->registry->forModel(TestModel::class));
+        // forModelAll returns both
+        $this->assertCount(2, $this->registry->forModelAll(TestModel::class));
+        // byRecord and byLexicon still overwrite (same record class/lexicon)
         $this->assertSame($mapper2, $this->registry->forRecord(TestRecord::class));
         $this->assertCount(1, $this->registry->all());
+    }
+
+    public function test_for_model_all_returns_all_mappers_for_model(): void
+    {
+        $mainMapper = new TestMainMapper();
+        $referenceMapper = new TestReferenceMapper();
+
+        $this->registry->register($mainMapper);
+        $this->registry->register($referenceMapper);
+
+        $mappers = $this->registry->forModelAll(ReferenceModel::class);
+
+        $this->assertCount(2, $mappers);
+        $this->assertSame($mainMapper, $mappers[0]);
+        $this->assertSame($referenceMapper, $mappers[1]);
+    }
+
+    public function test_for_model_all_returns_empty_array_for_unregistered_class(): void
+    {
+        $this->assertSame([], $this->registry->forModelAll('NonExistent\\Model'));
+    }
+
+    public function test_for_model_returns_first_registered_mapper(): void
+    {
+        $mainMapper = new TestMainMapper();
+        $referenceMapper = new TestReferenceMapper();
+
+        // Register reference first, then main
+        $this->registry->register($referenceMapper);
+        $this->registry->register($mainMapper);
+
+        // forModel returns first registered (reference mapper)
+        $this->assertSame($referenceMapper, $this->registry->forModel(ReferenceModel::class));
     }
 }
