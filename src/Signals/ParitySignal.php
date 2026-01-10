@@ -2,6 +2,7 @@
 
 namespace SocialDept\AtpParity\Signals;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\MapperRegistry;
@@ -222,6 +223,9 @@ class ParitySignal extends Signal
         // Check for existing model and potential conflict
         $existing = $mapper->findByUri($uri);
 
+        // Capture existing blob CIDs before any changes
+        $existingBlobs = $existing?->getAttribute('atp_blobs');
+
         if ($existing && $this->conflictDetector->hasConflict($existing, $record, $commit->cid)) {
             $strategy = ConflictStrategy::fromConfig();
             $resolution = $this->conflictResolver->resolve(
@@ -241,7 +245,9 @@ class ParitySignal extends Signal
 
             $this->debug('Conflict resolved', $event, ['resolution' => $resolution->outcome->value]);
 
-            // Conflict was resolved, model already updated if needed
+            // Sync blobs if changed during conflict resolution
+            $this->syncBlobsIfChanged($existing, $mapper, $existingBlobs);
+
             return;
         }
 
@@ -252,6 +258,9 @@ class ParitySignal extends Signal
             $this->debug('Skipping upsert: shouldImport returned false', $event);
         } else {
             $this->debug('Upsert successful', $event, ['model_id' => $result->getKey()]);
+
+            // Sync blobs to MediaLibrary if changed
+            $this->syncBlobsIfChanged($result, $mapper, $existingBlobs);
         }
     }
 
@@ -279,16 +288,89 @@ class ParitySignal extends Signal
     /**
      * Log debug message if signal debug is enabled.
      */
-    protected function debug(string $message, SignalEvent $event, array $extra = []): void
+    protected function debug(string $message, ?SignalEvent $event, array $extra = []): void
     {
         if (! config('signal.debug', false)) {
             return;
         }
 
         Log::debug("ParitySignal: {$message}", array_merge([
-            'did' => $event->did,
-            'collection' => $event->commit?->collection,
-            'operation' => $event->commit?->operation?->value ?? null,
+            'did' => $event?->did,
+            'collection' => $event?->commit?->collection,
+            'operation' => $event?->commit?->operation?->value ?? null,
         ], $extra));
+    }
+
+    /**
+     * Sync blobs to MediaLibrary if the blob CIDs have changed.
+     */
+    protected function syncBlobsIfChanged(Model $model, RecordMapper $mapper, ?array $oldBlobs): void
+    {
+        // Check if mapper has blob fields
+        if (! $mapper->hasBlobFields()) {
+            return;
+        }
+
+        // Check if model supports MediaLibrary sync
+        if (! method_exists($model, 'syncAtpBlobsToMedia')) {
+            return;
+        }
+
+        // Compare blob CIDs - only sync if different
+        $newBlobs = $model->getAttribute('atp_blobs');
+
+        if ($this->blobsUnchanged($oldBlobs, $newBlobs)) {
+            return;
+        }
+
+        try {
+            $this->debug('Syncing blobs to MediaLibrary', null, [
+                'model' => get_class($model),
+                'model_id' => $model->getKey(),
+                'old_blobs' => $oldBlobs,
+                'new_blobs' => $newBlobs,
+            ]);
+
+            $model->syncAtpBlobsToMedia();
+        } catch (\Throwable $e) {
+            Log::warning('ParitySignal: Failed to sync blobs to MediaLibrary', [
+                'model' => get_class($model),
+                'model_id' => $model->getKey(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Check if blob CIDs are unchanged between old and new values.
+     */
+    protected function blobsUnchanged(?array $oldBlobs, ?array $newBlobs): bool
+    {
+        $oldCids = $this->extractBlobCids($oldBlobs ?? []);
+        $newCids = $this->extractBlobCids($newBlobs ?? []);
+
+        return $oldCids === $newCids;
+    }
+
+    /**
+     * Extract blob CIDs from an atp_blobs array for comparison.
+     */
+    protected function extractBlobCids(array $blobs): array
+    {
+        $cids = [];
+
+        foreach ($blobs as $field => $data) {
+            if (isset($data['cid'])) {
+                // Single blob
+                $cids[$field] = $data['cid'];
+            } elseif (is_array($data)) {
+                // Array of blobs
+                $cids[$field] = array_map(fn ($b) => $b['cid'] ?? null, $data);
+            }
+        }
+
+        ksort($cids);
+
+        return $cids;
     }
 }
