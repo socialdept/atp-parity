@@ -2,6 +2,7 @@
 
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Enums\BlobUrlStrategy;
+use SocialDept\AtpParity\Enums\ValidationMode;
 
 return [
     /*
@@ -77,6 +78,28 @@ return [
         // Custom filter callback: function(SignalEvent $event): bool
         // Return true to sync the event, `false` to skip it
         'filter' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Incoming Record Validation
+    |--------------------------------------------------------------------------
+    |
+    | Validate incoming firehose/jetstream records against lexicon schemas
+    | before processing. Useful for filtering out malformed records from
+    | third-party lexicons.
+    |
+    */
+    'validation' => [
+        // Validation mode for incoming records:
+        // - 'disabled': Disabled (process all records regardless of validity)
+        // - 'strict': Reject records with unknown fields or constraint violations
+        // - 'optimistic': Allow unknown fields, enforce constraints (recommended)
+        // - 'lenient': Skip constraint checking, just validate types
+        'mode' => ValidationMode::tryFrom(env('PARITY_VALIDATION_MODE', 'disabled')),
+
+        // Log validation failures (helpful for debugging third-party lexicons)
+        'log_failures' => env('PARITY_VALIDATION_LOG', true),
     ],
 
     /*
