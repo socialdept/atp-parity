@@ -81,5 +81,31 @@ abstract class TestCase extends Orchestra
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
         });
+
+        // Reference model table (single model with dual URIs)
+        Schema::create('reference_models', function (Blueprint $table) {
+            $table->id();
+            $table->string('title')->nullable();
+            $table->string('did')->nullable();
+            $table->atp();
+            $table->atpReference();
+            $table->timestamps();
+        });
+
+        // Main model for pivot pattern
+        Schema::create('main_models', function (Blueprint $table) {
+            $table->id();
+            $table->string('content')->nullable();
+            $table->atp();
+            $table->timestamps();
+        });
+
+        // Pivot reference model table
+        Schema::create('pivot_reference_models', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('main_model_id')->nullable();
+            $table->atp();
+            $table->timestamps();
+        });
     }
 }

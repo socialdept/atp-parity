@@ -81,6 +81,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Reference Records
+    |--------------------------------------------------------------------------
+    |
+    | Settings for reference records - records that point to other records
+    | using strong references or AT-URIs. Used for claiming ownership of
+    | records using third-party lexicons.
+    |
+    */
+    'references' => [
+        // Column names for reference record metadata
+        'columns' => [
+            'reference_uri' => 'atp_reference_uri',
+            'reference_cid' => 'atp_reference_cid',
+        ],
+
+        // Rollback strategy when reference sync fails after main succeeds
+        // true: Delete main record if reference fails (atomic behavior)
+        // false: Keep main record even if reference fails (partial sync allowed)
+        'rollback_on_failure' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Conflict Resolution
     |--------------------------------------------------------------------------
     |

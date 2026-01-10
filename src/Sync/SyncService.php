@@ -47,10 +47,20 @@ class SyncService
             return SyncResult::failed('No mapper registered for model: '.get_class($model));
         }
 
+        return $this->syncAsWithMapper($did, $model, $mapper);
+    }
+
+    /**
+     * Sync a model as a specific user with an explicit mapper.
+     *
+     * Use this when a model has multiple mappers (e.g., main + reference records).
+     */
+    public function syncAsWithMapper(string $did, Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper): SyncResult
+    {
         // Check if already synced
         $existingUri = $this->getModelUri($model);
         if ($existingUri) {
-            return $this->resync($model);
+            return $this->resyncWithMapper($model, $mapper);
         }
 
         try {
@@ -84,16 +94,24 @@ class SyncService
      */
     public function resync(Model $model): SyncResult
     {
-        $uri = $this->getModelUri($model);
-
-        if (! $uri) {
-            return SyncResult::failed('Model has not been synced yet. Use sync() first.');
-        }
-
         $mapper = $this->registry->forModel(get_class($model));
 
         if (! $mapper) {
             return SyncResult::failed('No mapper registered for model: '.get_class($model));
+        }
+
+        return $this->resyncWithMapper($model, $mapper);
+    }
+
+    /**
+     * Resync an existing synced record with an explicit mapper.
+     */
+    public function resyncWithMapper(Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper): SyncResult
+    {
+        $uri = $this->getModelUri($model);
+
+        if (! $uri) {
+            return SyncResult::failed('Model has not been synced yet. Use sync() first.');
         }
 
         $parts = $this->parseUri($uri);
