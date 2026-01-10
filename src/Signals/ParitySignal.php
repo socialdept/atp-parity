@@ -155,10 +155,23 @@ class ParitySignal extends Signal
 
         $this->debug('Processing event', $event, ['mapper' => get_class($mapper)]);
 
-        if ($commit->isCreate() || $commit->isUpdate()) {
-            $this->handleUpsert($event, $mapper);
-        } elseif ($commit->isDelete()) {
-            $this->handleDelete($event, $mapper);
+        try {
+            if ($commit->isCreate() || $commit->isUpdate()) {
+                $this->handleUpsert($event, $mapper);
+            } elseif ($commit->isDelete()) {
+                $this->handleDelete($event, $mapper);
+            }
+        } catch (\Throwable $e) {
+            Log::error('ParitySignal: Error processing event', [
+                'did' => $event->did,
+                'collection' => $commit->collection,
+                'operation' => $commit->operation?->value ?? null,
+                'rkey' => $commit->rkey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e; // Re-throw to let EventDispatcher handle it
         }
     }
 
