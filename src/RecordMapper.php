@@ -113,8 +113,24 @@ abstract class RecordMapper implements RecordMapperContract
         return $modelClass::where($this->uriColumn(), $uri)->first();
     }
 
-    public function upsert(Data $record, array $meta = []): Model
+    /**
+     * Determine if a record should be imported.
+     *
+     * Override this method to add custom import conditions.
+     * Return false to skip importing this record.
+     */
+    public function shouldImport(Data $record, array $meta = []): bool
     {
+        return true;
+    }
+
+    public function upsert(Data $record, array $meta = []): ?Model
+    {
+        // Check if import should proceed
+        if (! $this->shouldImport($record, $meta)) {
+            return null;
+        }
+
         $uri = $meta['uri'] ?? null;
 
         if ($uri) {

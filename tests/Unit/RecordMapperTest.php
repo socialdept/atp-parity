@@ -181,4 +181,109 @@ class RecordMapperTest extends TestCase
 
         $this->assertFalse($result);
     }
+
+    public function test_should_import_returns_true_by_default(): void
+    {
+        $record = new TestRecord(text: 'Test');
+        $meta = ['did' => 'did:plc:test', 'rkey' => 'abc123'];
+
+        $this->assertTrue($this->mapper->shouldImport($record, $meta));
+    }
+
+    public function test_upsert_returns_null_when_should_import_returns_false(): void
+    {
+        $mapper = new class extends TestMapper {
+            public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
+            {
+                return false;
+            }
+        };
+
+        $record = new TestRecord(text: 'Should not import');
+        $meta = [
+            'uri' => 'at://did:plc:unknown/app.test.record/abc',
+            'cid' => 'bafyrei123',
+            'did' => 'did:plc:unknown',
+            'rkey' => 'abc',
+        ];
+
+        $result = $mapper->upsert($record, $meta);
+
+        $this->assertNull($result);
+    }
+
+    public function test_upsert_does_not_create_model_when_should_import_returns_false(): void
+    {
+        $mapper = new class extends TestMapper {
+            public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
+            {
+                return false;
+            }
+        };
+
+        $record = new TestRecord(text: 'Should not import');
+        $meta = [
+            'uri' => 'at://did:plc:unknown/app.test.record/skip',
+            'cid' => 'bafyrei123',
+        ];
+
+        $mapper->upsert($record, $meta);
+
+        // Verify no model was created
+        $this->assertNull($mapper->findByUri('at://did:plc:unknown/app.test.record/skip'));
+    }
+
+    public function test_should_import_receives_meta_with_did_and_rkey(): void
+    {
+        $receivedMeta = null;
+
+        $mapper = new class($receivedMeta) extends TestMapper {
+            public function __construct(private ?array &$receivedMeta) {}
+
+            public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
+            {
+                $this->receivedMeta = $meta;
+
+                return true;
+            }
+        };
+
+        $record = new TestRecord(text: 'Test');
+        $meta = [
+            'uri' => 'at://did:plc:test/app.test.record/xyz',
+            'cid' => 'bafyrei456',
+            'did' => 'did:plc:test',
+            'rkey' => 'xyz',
+        ];
+
+        $mapper->upsert($record, $meta);
+
+        $this->assertSame('did:plc:test', $receivedMeta['did']);
+        $this->assertSame('xyz', $receivedMeta['rkey']);
+    }
+
+    public function test_upsert_proceeds_when_should_import_returns_true(): void
+    {
+        $mapper = new class extends TestMapper {
+            public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
+            {
+                // Only import if did is known
+                return ($meta['did'] ?? null) === 'did:plc:known';
+            }
+        };
+
+        $record = new TestRecord(text: 'Known user record');
+        $meta = [
+            'uri' => 'at://did:plc:known/app.test.record/allowed',
+            'cid' => 'bafyrei789',
+            'did' => 'did:plc:known',
+            'rkey' => 'allowed',
+        ];
+
+        $model = $mapper->upsert($record, $meta);
+
+        $this->assertNotNull($model);
+        $this->assertTrue($model->exists);
+        $this->assertSame('Known user record', $model->content);
+    }
 }
