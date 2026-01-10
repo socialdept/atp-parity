@@ -185,6 +185,8 @@ class ParitySignal extends Signal
         $meta = [
             'uri' => $uri,
             'cid' => $commit->cid,
+            'did' => $event->did,
+            'rkey' => $commit->rkey,
         ];
 
         // Check for existing model and potential conflict

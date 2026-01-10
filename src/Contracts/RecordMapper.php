@@ -60,13 +60,26 @@ interface RecordMapper
     public function updateModel(Model $model, Data $record, array $meta = []): Model;
 
     /**
-     * Find or create model from record.
+     * Determine if a record should be imported.
+     *
+     * Override this method to add custom import conditions.
+     * Return false to skip importing this record.
      *
      * @param  TRecord  $record
      * @param  array{uri?: string, cid?: string, did?: string, rkey?: string}  $meta
-     * @return TModel
      */
-    public function upsert(Data $record, array $meta = []): Model;
+    public function shouldImport(Data $record, array $meta = []): bool;
+
+    /**
+     * Find or create model from record.
+     *
+     * Returns null if shouldImport() returns false.
+     *
+     * @param  TRecord  $record
+     * @param  array{uri?: string, cid?: string, did?: string, rkey?: string}  $meta
+     * @return TModel|null
+     */
+    public function upsert(Data $record, array $meta = []): ?Model;
 
     /**
      * Find model by AT Protocol URI.
