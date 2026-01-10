@@ -18,7 +18,7 @@
         "socialdept/atp-schema": "^0.3",
         "socialdept/atp-client": "^0.0",
         "socialdept/atp-resolver": "^1.1",
-        "socialdept/atp-signals": "^1.1"
+        "socialdept/atp-signals": "^1.2"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0|^11.0",
