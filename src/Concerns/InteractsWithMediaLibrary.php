@@ -37,15 +37,19 @@ trait InteractsWithMediaLibrary
     /**
      * Sync AT Protocol blobs to MediaLibrary.
      * Downloads blobs if needed and adds to collections.
+     *
+     * @param  string|null  $did  Optional DID override (used by ParitySignal)
      */
-    public function syncAtpBlobsToMedia(): void
+    public function syncAtpBlobsToMedia(?string $did = null): void
     {
         if (! $this->mediaLibraryAvailable()) {
             return;
         }
 
         $manager = app(BlobManager::class);
-        $did = $this->getAtpDid();
+
+        // Use provided DID or fall back to extracting from atp_uri
+        $did = $did ?? $this->getAtpDid();
 
         if (! $did) {
             return;
