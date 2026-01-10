@@ -222,7 +222,35 @@ class ParitySignal extends Signal
             return;
         }
 
-        $record = $recordClass::fromArray((array) $commit->record);
+        // Get validation mode early - needed to decide how to handle fromArray() failures
+        $validationMode = $this->getValidationMode($mapper);
+
+        // Try to create the record - may fail if data is malformed
+        try {
+            $record = $recordClass::fromArray((array) $commit->record);
+        } catch (\Throwable $e) {
+            // Validation disabled - re-throw the exception
+            if (! $validationMode || $validationMode === ValidationMode::Disabled) {
+                throw $e;
+            }
+
+            // Validation enabled - treat construction failures as validation failures
+            if (config('parity.validation.log_failures', true)) {
+                Log::warning('ParitySignal: Record failed to construct', [
+                    'did' => $event->did,
+                    'collection' => $commit->collection,
+                    'rkey' => $commit->rkey,
+                    'validation_mode' => $validationMode->value,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            $this->debug('Skipping upsert: record failed to construct', $event, [
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
 
         // Validate record against lexicon schema if validation is enabled
         if (! $this->validateRecord($record, $mapper, $event)) {
@@ -303,6 +331,22 @@ class ParitySignal extends Signal
     }
 
     /**
+     * Get the effective validation mode for a mapper.
+     *
+     * Checks mapper-specific mode first, then falls back to config.
+     */
+    protected function getValidationMode(RecordMapper $mapper): ?ValidationMode
+    {
+        $configMode = config('parity.validation.mode');
+
+        return $mapper->validationMode() ?? match (true) {
+            $configMode instanceof ValidationMode => $configMode,
+            is_string($configMode) => ValidationMode::tryFrom($configMode),
+            default => null,
+        };
+    }
+
+    /**
      * Validate record against lexicon schema if validation is enabled.
      *
      * Returns true if record is valid or validation is disabled.
@@ -310,13 +354,7 @@ class ParitySignal extends Signal
      */
     protected function validateRecord(Data $record, RecordMapper $mapper, SignalEvent $event): bool
     {
-        // Check mapper-specific validation mode first, fall back to config
-        $configMode = config('parity.validation.mode');
-        $mode = $mapper->validationMode() ?? match (true) {
-            $configMode instanceof ValidationMode => $configMode,
-            is_string($configMode) => ValidationMode::tryFrom($configMode),
-            default => null,
-        };
+        $mode = $this->getValidationMode($mapper);
 
         // Validation disabled or not configured
         if (! $mode || $mode === ValidationMode::Disabled) {
