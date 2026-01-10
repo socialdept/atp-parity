@@ -16,7 +16,7 @@ class MapperRegistry
     /** @var array<class-string<Data>, RecordMapper> */
     protected array $byRecord = [];
 
-    /** @var array<class-string<Model>, RecordMapper> */
+    /** @var array<class-string<Model>, array<RecordMapper>> */
     protected array $byModel = [];
 
     /** @var array<string, RecordMapper> Keyed by NSID */
@@ -31,7 +31,7 @@ class MapperRegistry
         $modelClass = $mapper->modelClass();
 
         $this->byRecord[$recordClass] = $mapper;
-        $this->byModel[$modelClass] = $mapper;
+        $this->byModel[$modelClass][] = $mapper;
         $this->byLexicon[$mapper->lexicon()] = $mapper;
     }
 
@@ -46,13 +46,26 @@ class MapperRegistry
     }
 
     /**
-     * Get a mapper by Model class.
+     * Get the first mapper for a Model class.
      *
      * @param  class-string<Model>  $modelClass
      */
     public function forModel(string $modelClass): ?RecordMapper
     {
-        return $this->byModel[$modelClass] ?? null;
+        return $this->byModel[$modelClass][0] ?? null;
+    }
+
+    /**
+     * Get all mappers for a Model class.
+     *
+     * Useful when a model has multiple mappers (e.g., main + reference records).
+     *
+     * @param  class-string<Model>  $modelClass
+     * @return array<RecordMapper>
+     */
+    public function forModelAll(string $modelClass): array
+    {
+        return $this->byModel[$modelClass] ?? [];
     }
 
     /**

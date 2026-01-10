@@ -10,6 +10,7 @@ use SocialDept\AtpParity\MapperRegistry;
  * @method static void register(RecordMapper $mapper)
  * @method static RecordMapper|null forRecord(string $recordClass)
  * @method static RecordMapper|null forModel(string $modelClass)
+ * @method static array<RecordMapper> forModelAll(string $modelClass)
  * @method static RecordMapper|null forLexicon(string $nsid)
  *
  * @see MapperRegistry
