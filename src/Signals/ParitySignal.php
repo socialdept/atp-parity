@@ -2,6 +2,7 @@
 
 namespace SocialDept\AtpParity\Signals;
 
+use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ConflictDetector;
@@ -109,12 +110,16 @@ class ParitySignal extends Signal
     public function handle(SignalEvent $event): void
     {
         if (! $event->commit) {
+            $this->debug('Skipping: no commit event', $event);
+
             return;
         }
 
         // Apply DID filter
         $dids = $this->dids();
         if ($dids !== null && ! in_array($event->did, $dids)) {
+            $this->debug('Skipping: DID not in allowed list', $event, ['allowed_dids' => $dids]);
+
             return;
         }
 
@@ -125,20 +130,30 @@ class ParitySignal extends Signal
         if ($operations !== null) {
             $operation = $this->getOperationType($commit);
             if (! in_array($operation, $operations)) {
+                $this->debug('Skipping: operation not allowed', $event, [
+                    'allowed_operations' => $operations,
+                ]);
+
                 return;
             }
         }
 
         // Apply custom filter
         if (! $this->shouldSync($event)) {
+            $this->debug('Skipping: shouldSync returned false', $event);
+
             return;
         }
 
         $mapper = $this->registry->forLexicon($commit->collection);
 
         if (! $mapper) {
+            $this->debug('Skipping: no mapper found for collection', $event);
+
             return;
         }
+
+        $this->debug('Processing event', $event, ['mapper' => get_class($mapper)]);
 
         if ($commit->isCreate() || $commit->isUpdate()) {
             $this->handleUpsert($event, $mapper);
@@ -175,6 +190,8 @@ class ParitySignal extends Signal
         $commit = $event->commit;
 
         if (! $commit->record) {
+            $this->debug('Skipping upsert: record is empty', $event);
+
             return;
         }
 
@@ -204,15 +221,25 @@ class ParitySignal extends Signal
 
             // If conflict is pending manual resolution, don't apply changes
             if (! $resolution->isResolved()) {
+                $this->debug('Skipping upsert: conflict pending manual resolution', $event);
+
                 return;
             }
+
+            $this->debug('Conflict resolved', $event, ['resolution' => $resolution->outcome->value]);
 
             // Conflict was resolved, model already updated if needed
             return;
         }
 
         // No conflict, proceed with normal upsert
-        $mapper->upsert($record, $meta);
+        $result = $mapper->upsert($record, $meta);
+
+        if ($result === null) {
+            $this->debug('Skipping upsert: shouldImport returned false', $event);
+        } else {
+            $this->debug('Upsert successful', $event, ['model_id' => $result->getKey()]);
+        }
     }
 
     /**
@@ -223,7 +250,9 @@ class ParitySignal extends Signal
         $commit = $event->commit;
         $uri = $this->buildUri($event->did, $commit->collection, $commit->rkey);
 
-        $mapper->deleteByUri($uri);
+        $deleted = $mapper->deleteByUri($uri);
+
+        $this->debug($deleted ? 'Delete successful' : 'Delete skipped: model not found', $event, ['uri' => $uri]);
     }
 
     /**
@@ -232,5 +261,21 @@ class ParitySignal extends Signal
     protected function buildUri(string $did, string $collection, string $rkey): string
     {
         return "at://{$did}/{$collection}/{$rkey}";
+    }
+
+    /**
+     * Log debug message if signal debug is enabled.
+     */
+    protected function debug(string $message, SignalEvent $event, array $extra = []): void
+    {
+        if (! config('signal.debug', false)) {
+            return;
+        }
+
+        Log::debug("ParitySignal: {$message}", array_merge([
+            'did' => $event->did,
+            'collection' => $event->commit?->collection,
+            'operation' => $event->commit?->operation?->value ?? null,
+        ], $extra));
     }
 }
