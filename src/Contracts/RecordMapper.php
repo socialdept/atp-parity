@@ -3,6 +3,7 @@
 namespace SocialDept\AtpParity\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpSchema\Data\Data;
 
 /**
@@ -92,4 +93,16 @@ interface RecordMapper
      * Delete model by AT Protocol URI.
      */
     public function deleteByUri(string $uri): bool;
+
+    /**
+     * Get the validation mode for incoming records.
+     *
+     * Return null to use the global config value.
+     */
+    public function validationMode(): ?ValidationMode;
+
+    /**
+     * Check if this mapper has blob fields defined.
+     */
+    public function hasBlobFields(): bool;
 }

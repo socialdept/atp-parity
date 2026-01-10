@@ -8,7 +8,9 @@ use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ConflictDetector;
 use SocialDept\AtpParity\Sync\ConflictResolver;
+use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Sync\ConflictStrategy;
+use SocialDept\AtpSchema\Data\Data;
 use SocialDept\AtpSignals\Events\SignalEvent;
 use SocialDept\AtpSignals\Signals\Signal;
 
@@ -210,7 +212,22 @@ class ParitySignal extends Signal
         }
 
         $recordClass = $mapper->recordClass();
+
+        // Ensure record class extends Data (required for validation)
+        if (! is_subclass_of($recordClass, Data::class)) {
+            $this->debug('Skipping upsert: record class does not extend Data', $event, [
+                'record_class' => $recordClass,
+            ]);
+
+            return;
+        }
+
         $record = $recordClass::fromArray((array) $commit->record);
+
+        // Validate record against lexicon schema if validation is enabled
+        if (! $this->validateRecord($record, $mapper, $event)) {
+            return;
+        }
 
         $uri = $this->buildUri($event->did, $commit->collection, $commit->rkey);
         $meta = [
@@ -283,6 +300,59 @@ class ParitySignal extends Signal
     protected function buildUri(string $did, string $collection, string $rkey): string
     {
         return "at://{$did}/{$collection}/{$rkey}";
+    }
+
+    /**
+     * Validate record against lexicon schema if validation is enabled.
+     *
+     * Returns true if record is valid or validation is disabled.
+     * Returns false if record fails validation (should be skipped).
+     */
+    protected function validateRecord(Data $record, RecordMapper $mapper, SignalEvent $event): bool
+    {
+        // Check mapper-specific validation mode first, fall back to config
+        $configMode = config('parity.validation.mode');
+        $mode = $mapper->validationMode() ?? match (true) {
+            $configMode instanceof ValidationMode => $configMode,
+            is_string($configMode) => ValidationMode::tryFrom($configMode),
+            default => null,
+        };
+
+        // Validation disabled or not configured
+        if (! $mode || $mode === ValidationMode::Disabled) {
+            return true;
+        }
+
+        // Set validation mode on the schema validator
+        if (function_exists('SocialDept\AtpSchema\schema')) {
+            $schema = \SocialDept\AtpSchema\schema();
+            $schema->getValidator()->setMode($mode->value);
+        }
+
+        // Validate the record
+        $errors = $record->validateWithErrors();
+
+        if (empty($errors)) {
+            return true;
+        }
+
+        // Log validation failures if enabled
+        if (config('parity.validation.log_failures', true)) {
+            Log::warning('ParitySignal: Record failed validation', [
+                'did' => $event->did,
+                'collection' => $event->commit?->collection,
+                'rkey' => $event->commit?->rkey,
+                'validation_mode' => $mode->value,
+                'errors' => $errors,
+            ]);
+        }
+
+        $this->debug('Skipping upsert: record failed validation', $event, [
+            'validation_mode' => $mode->value,
+            'errors' => $errors,
+        ]);
+
+        return false;
     }
 
     /**

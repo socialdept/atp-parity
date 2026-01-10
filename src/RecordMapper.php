@@ -4,6 +4,7 @@ namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
+use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -122,6 +123,17 @@ abstract class RecordMapper implements RecordMapperContract
     public function shouldImport(Data $record, array $meta = []): bool
     {
         return true;
+    }
+
+    /**
+     * Get the validation mode for incoming records.
+     *
+     * Override this method to set a per-mapper validation mode.
+     * Return null to use the global config value.
+     */
+    public function validationMode(): ?ValidationMode
+    {
+        return null; // Use global config
     }
 
     public function upsert(Data $record, array $meta = []): ?Model
