@@ -291,7 +291,7 @@ class ParitySignal extends Signal
             $this->debug('Conflict resolved', $event, ['resolution' => $resolution->outcome->value]);
 
             // Sync blobs if changed during conflict resolution
-            $this->syncBlobsIfChanged($existing, $mapper, $existingBlobs);
+            $this->syncBlobsIfChanged($existing, $mapper, $existingBlobs, $event->did);
 
             return;
         }
@@ -305,7 +305,7 @@ class ParitySignal extends Signal
             $this->debug('Upsert successful', $event, ['model_id' => $result->getKey()]);
 
             // Sync blobs to MediaLibrary if changed
-            $this->syncBlobsIfChanged($result, $mapper, $existingBlobs);
+            $this->syncBlobsIfChanged($result, $mapper, $existingBlobs, $event->did);
         }
     }
 
@@ -412,7 +412,7 @@ class ParitySignal extends Signal
     /**
      * Sync blobs to MediaLibrary if the blob CIDs have changed.
      */
-    protected function syncBlobsIfChanged(Model $model, RecordMapper $mapper, ?array $oldBlobs): void
+    protected function syncBlobsIfChanged(Model $model, RecordMapper $mapper, ?array $oldBlobs, ?string $did = null): void
     {
         // Check if mapper has blob fields
         if (! $mapper->hasBlobFields()) {
@@ -435,11 +435,12 @@ class ParitySignal extends Signal
             $this->debug('Syncing blobs to MediaLibrary', null, [
                 'model' => get_class($model),
                 'model_id' => $model->getKey(),
+                'did' => $did,
                 'old_blobs' => $oldBlobs,
                 'new_blobs' => $newBlobs,
             ]);
 
-            $model->syncAtpBlobsToMedia();
+            $model->syncAtpBlobsToMedia($did);
         } catch (\Throwable $e) {
             Log::warning('ParitySignal: Failed to sync blobs to MediaLibrary', [
                 'model' => get_class($model),
