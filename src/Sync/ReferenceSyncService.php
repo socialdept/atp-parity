@@ -156,6 +156,54 @@ class ReferenceSyncService
     }
 
     /**
+     * Resync both main and reference records.
+     *
+     * Updates main record first, then reference record.
+     * Tracks CID changes to know if records actually changed.
+     */
+    public function resyncWithReference(Model $model, ReferenceMapper $referenceMapper): ReferenceSyncResult
+    {
+        $mainMapper = $referenceMapper->mainMapper();
+
+        if (! $mainMapper) {
+            return ReferenceSyncResult::failed(
+                "No mapper registered for main lexicon: {$referenceMapper->mainLexicon()}"
+            );
+        }
+
+        // Get current CIDs for comparison
+        $oldMainCid = $model->{config('parity.columns.cid', 'atp_cid')};
+        $oldReferenceCid = $model->{$referenceMapper->referenceCidColumn()};
+
+        // Step 1: Resync main record
+        $mainResult = $this->syncService->resyncWithMapper($model, $mainMapper);
+
+        if ($mainResult->isFailed()) {
+            return ReferenceSyncResult::failed($mainResult->error);
+        }
+
+        // Step 2: Resync reference record
+        $referenceResult = $this->resyncReference($model, $referenceMapper);
+
+        if ($referenceResult->isFailed()) {
+            // Main succeeded but reference failed - return partial success
+            return ReferenceSyncResult::success(
+                mainUri: $mainResult->uri,
+                mainCid: $mainResult->cid,
+                referenceUri: $model->{$referenceMapper->referenceUriColumn()},
+                referenceCid: $oldReferenceCid
+            );
+        }
+
+        return ReferenceSyncResult::success(
+            mainUri: $mainResult->uri,
+            mainCid: $mainResult->cid,
+            referenceUri: $referenceResult->uri,
+            referenceCid: $referenceResult->cid
+        );
+    }
+
+    /**
      * Resync an existing reference record.
      */
     public function resyncReference(Model $model, ReferenceMapper $mapper): SyncResult
