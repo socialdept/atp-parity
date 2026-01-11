@@ -4,6 +4,7 @@ namespace SocialDept\AtpParity\PendingSync;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use SocialDept\AtpClient\Exceptions\AuthenticationException;
 use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
@@ -63,6 +64,14 @@ class PendingSyncManager
 
         $this->store->store($pendingSync);
 
+        $this->log('info', 'Pending sync captured', [
+            'id' => $pendingSync->id,
+            'did' => $did,
+            'model' => $pendingSync->modelClass,
+            'model_id' => $pendingSync->modelId,
+            'operation' => $operation->value,
+        ]);
+
         event(new PendingSyncCaptured($pendingSync, $model));
 
         return $pendingSync;
@@ -87,6 +96,13 @@ class PendingSyncManager
                 $this->store->remove($pendingSync->id);
                 $skipped++;
 
+                $this->log('warning', 'Pending sync skipped (max attempts exceeded)', [
+                    'id' => $pendingSync->id,
+                    'model' => $pendingSync->modelClass,
+                    'model_id' => $pendingSync->modelId,
+                    'attempts' => $pendingSync->attempts,
+                ]);
+
                 continue;
             }
 
@@ -100,10 +116,25 @@ class PendingSyncManager
                 if ($result) {
                     $this->store->remove($pendingSync->id);
                     $succeeded++;
+
+                    $this->log('info', 'Pending sync retry succeeded', [
+                        'id' => $pendingSync->id,
+                        'model' => $pendingSync->modelClass,
+                        'model_id' => $pendingSync->modelId,
+                    ]);
+
                     event(new PendingSyncRetried($pendingSync, true));
                 } else {
                     $failed++;
                     $errors[] = "Failed to retry sync for {$pendingSync->modelClass}:{$pendingSync->modelId}";
+
+                    $this->log('warning', 'Pending sync retry failed', [
+                        'id' => $pendingSync->id,
+                        'model' => $pendingSync->modelClass,
+                        'model_id' => $pendingSync->modelId,
+                        'attempts' => $pendingSync->attempts,
+                    ]);
+
                     event(new PendingSyncRetried($pendingSync, false));
                 }
             } catch (Throwable $e) {
@@ -114,6 +145,14 @@ class PendingSyncManager
 
                 $failed++;
                 $errors[] = $e->getMessage();
+
+                $this->log('error', 'Pending sync retry exception', [
+                    'id' => $pendingSync->id,
+                    'model' => $pendingSync->modelClass,
+                    'model_id' => $pendingSync->modelId,
+                    'error' => $e->getMessage(),
+                ]);
+
                 event(new PendingSyncFailed($pendingSync, $e));
             }
         }
@@ -272,5 +311,15 @@ class PendingSyncManager
     public function removeForDid(string $did): int
     {
         return $this->store->removeForDid($did);
+    }
+
+    /**
+     * Log a message if logging is enabled.
+     */
+    protected function log(string $level, string $message, array $context = []): void
+    {
+        if (config('parity.pending_syncs.log', false)) {
+            Log::{$level}("[Parity] {$message}", $context);
+        }
     }
 }
