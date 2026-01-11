@@ -292,27 +292,27 @@ class ParityServiceProvider extends ServiceProvider
      */
     protected function publishMigrations(): void
     {
-        $migrationPath = __DIR__.'/../database/migrations';
-        $date = date('Y_m_d');
+        $path = __DIR__.'/../database/migrations';
+        $dest = database_path('migrations');
 
         // Core migration (import states) - always needed
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_import_states_table.php' => database_path("migrations/{$date}_000001_create_parity_import_states_table.php"),
+            $path.'/create_parity_import_states_table.php' => $dest.'/0000_00_00_000001_create_parity_import_states_table.php',
         ], 'parity-migrations');
 
         // Optional: Manual conflict resolution (strategy = 'manual')
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_conflicts_table.php' => database_path("migrations/{$date}_000002_create_parity_conflicts_table.php"),
+            $path.'/create_parity_conflicts_table.php' => $dest.'/0000_00_00_000002_create_parity_conflicts_table.php',
         ], 'parity-migrations-conflicts');
 
         // Optional: Filesystem blob storage (storage_driver = 'filesystem')
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_blob_mappings_table.php' => database_path("migrations/{$date}_000003_create_parity_blob_mappings_table.php"),
+            $path.'/create_parity_blob_mappings_table.php' => $dest.'/0000_00_00_000003_create_parity_blob_mappings_table.php',
         ], 'parity-migrations-blobs');
 
         // Optional: Database pending sync storage (storage = 'database')
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_pending_syncs_table.php' => database_path("migrations/{$date}_000004_create_parity_pending_syncs_table.php"),
+            $path.'/create_parity_pending_syncs_table.php' => $dest.'/0000_00_00_000004_create_parity_pending_syncs_table.php',
         ], 'parity-migrations-pending-syncs');
     }
 
