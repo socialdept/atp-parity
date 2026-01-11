@@ -5,6 +5,7 @@ namespace SocialDept\AtpParity\Listeners;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpClient\Events\SessionAuthenticated;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
+use Throwable;
 
 /**
  * Automatically retries pending syncs when a user re-authenticates.
@@ -44,15 +45,23 @@ class RetryPendingSyncsOnAuth
             'count' => $count,
         ]);
 
-        $result = $this->manager->retryForDid($did);
+        try {
+            $result = $this->manager->retryForDid($did);
 
-        $this->log('info', 'Pending syncs retry completed', [
-            'did' => $did,
-            'total' => $result->total,
-            'succeeded' => $result->succeeded,
-            'failed' => $result->failed,
-            'skipped' => $result->skipped,
-        ]);
+            $this->log('info', 'Pending syncs retry completed', [
+                'did' => $did,
+                'total' => $result->total,
+                'succeeded' => $result->succeeded,
+                'failed' => $result->failed,
+                'skipped' => $result->skipped,
+            ]);
+        } catch (Throwable $e) {
+            $this->log('error', 'Pending syncs retry failed with exception', [
+                'did' => $did,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
