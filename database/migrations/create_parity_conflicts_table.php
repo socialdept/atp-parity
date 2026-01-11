@@ -8,11 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Skip if not using manual conflict resolution
-        if (config('parity.conflicts.strategy', 'remote') !== 'manual') {
-            return;
-        }
-
         $table = config('parity.conflicts.table', 'parity_conflicts');
 
         Schema::create($table, function (Blueprint $table) {

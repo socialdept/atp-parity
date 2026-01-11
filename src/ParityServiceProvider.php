@@ -272,9 +272,7 @@ class ParityServiceProvider extends ServiceProvider
             __DIR__.'/../config/parity.php' => config_path('parity.php'),
         ], 'parity-config');
 
-        $this->publishes([
-            __DIR__.'/../database/migrations' => database_path('migrations'),
-        ], 'parity-migrations');
+        $this->publishMigrations();
 
         $this->publishes([
             __DIR__.'/../stubs/mapper.stub' => base_path('stubs/atp-mapper.stub'),
@@ -287,6 +285,34 @@ class ParityServiceProvider extends ServiceProvider
             ImportStatusCommand::class,
             MakeMapperCommand::class,
         ]);
+    }
+
+    /**
+     * Publish migrations with separate tags for optional features.
+     */
+    protected function publishMigrations(): void
+    {
+        $migrationPath = __DIR__.'/../database/migrations';
+
+        // Core migration (import states) - always needed
+        $this->publishesMigrations([
+            $migrationPath.'/create_parity_import_states_table.php',
+        ], 'parity-migrations');
+
+        // Optional: Manual conflict resolution (strategy = 'manual')
+        $this->publishesMigrations([
+            $migrationPath.'/create_parity_conflicts_table.php',
+        ], 'parity-migrations-conflicts');
+
+        // Optional: Filesystem blob storage (storage_driver = 'filesystem')
+        $this->publishesMigrations([
+            $migrationPath.'/create_parity_blob_mappings_table.php',
+        ], 'parity-migrations-blobs');
+
+        // Optional: Database pending sync storage (storage = 'database')
+        $this->publishesMigrations([
+            $migrationPath.'/create_parity_pending_syncs_table.php',
+        ], 'parity-migrations-pending-syncs');
     }
 
     public function provides(): array

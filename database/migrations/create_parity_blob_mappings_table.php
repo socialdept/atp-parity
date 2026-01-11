@@ -8,12 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Skip if using medialibrary blob storage (default is filesystem)
-        $driver = config('parity.blobs.storage_driver');
-        if ($driver?->value === 'medialibrary') {
-            return;
-        }
-
         $table = config('parity.blobs.table', 'parity_blob_mappings');
 
         Schema::create($table, function (Blueprint $table) {

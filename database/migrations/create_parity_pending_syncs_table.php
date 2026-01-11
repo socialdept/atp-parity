@@ -8,11 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Skip if not using database storage
-        if (config('parity.pending_syncs.storage', 'cache') !== 'database') {
-            return;
-        }
-
         $table = config('parity.pending_syncs.table', 'parity_pending_syncs');
 
         Schema::create($table, function (Blueprint $table) {

@@ -396,14 +396,25 @@ Schema::table('posts', function (Blueprint $table) {
 });
 ```
 
-Publish and run Parity's migrations for import state tracking and blob mappings:
+Publish and run Parity's core migration:
 
 ```bash
 php artisan vendor:publish --tag=parity-migrations
 php artisan migrate
 ```
 
-**Note:** The `parity_blob_mappings` migration is only required if using the `filesystem` storage driver. If using `medialibrary` mode, you can skip this migration.
+Optional migrations are published separately based on which features you use:
+
+```bash
+# Manual conflict resolution (conflicts.strategy = 'manual')
+php artisan vendor:publish --tag=parity-migrations-conflicts
+
+# Filesystem blob storage (blobs.storage_driver = 'filesystem')
+php artisan vendor:publish --tag=parity-migrations-blobs
+
+# Database pending sync storage (pending_syncs.storage = 'database')
+php artisan vendor:publish --tag=parity-migrations-pending-syncs
+```
 
 ## Configuration
 
