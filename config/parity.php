@@ -171,6 +171,9 @@ return [
         // Auto-retry when SessionAuthenticated event fires
         'auto_retry' => env('PARITY_PENDING_SYNCS_AUTO_RETRY', false),
 
+        // Log pending sync operations (capture, retry, failure)
+        'log' => env('PARITY_PENDING_SYNCS_LOG', false),
+
         // Database table name (for database storage)
         'table' => 'parity_pending_syncs',
 
