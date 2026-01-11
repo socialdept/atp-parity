@@ -125,6 +125,20 @@ trait SyncsWithReference
     }
 
     /**
+     * Resync both main and reference records.
+     */
+    public function resyncWithReference(): ReferenceSyncResult
+    {
+        $mapper = $this->getReferenceMapper();
+
+        if (! $mapper) {
+            return ReferenceSyncResult::failed('No reference mapper registered for model: '.static::class);
+        }
+
+        return app(ReferenceSyncService::class)->resyncWithReference($this, $mapper);
+    }
+
+    /**
      * Unsync both main and reference records.
      */
     public function unsyncWithReference(): bool

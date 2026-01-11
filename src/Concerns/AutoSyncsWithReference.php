@@ -40,8 +40,8 @@ trait AutoSyncsWithReference
                 $mapper = $model->getReferenceMapper();
 
                 if ($mapper) {
-                    // Resync both records
-                    app(ReferenceSyncService::class)->resyncReference($model, $mapper);
+                    // Resync BOTH main and reference records
+                    app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
                 }
             }
         });
