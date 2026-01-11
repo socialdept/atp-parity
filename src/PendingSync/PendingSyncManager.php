@@ -113,7 +113,7 @@ class PendingSyncManager
             try {
                 $result = $this->retry($pendingSync);
 
-                if ($result) {
+                if ($result['success']) {
                     $this->store->remove($pendingSync->id);
                     $succeeded++;
 
@@ -126,13 +126,15 @@ class PendingSyncManager
                     event(new PendingSyncRetried($pendingSync, true));
                 } else {
                     $failed++;
-                    $errors[] = "Failed to retry sync for {$pendingSync->modelClass}:{$pendingSync->modelId}";
+                    $errorMessage = $result['error'] ?? "Failed to retry sync for {$pendingSync->modelClass}:{$pendingSync->modelId}";
+                    $errors[] = $errorMessage;
 
                     $this->log('warning', 'Pending sync retry failed', [
                         'id' => $pendingSync->id,
                         'model' => $pendingSync->modelClass,
                         'model_id' => $pendingSync->modelId,
                         'attempts' => $pendingSync->attempts,
+                        'error' => $errorMessage,
                     ]);
 
                     event(new PendingSyncRetried($pendingSync, false));
@@ -168,8 +170,10 @@ class PendingSyncManager
 
     /**
      * Retry a single pending sync.
+     *
+     * @return array{success: bool, error: ?string}
      */
-    protected function retry(PendingSync $pendingSync): bool
+    protected function retry(PendingSync $pendingSync): array
     {
         // Find the model
         $modelClass = $pendingSync->modelClass;
@@ -177,7 +181,13 @@ class PendingSyncManager
 
         // Model was deleted - consider it "handled"
         if (! $model) {
-            return true;
+            $this->log('info', 'Pending sync model was deleted, marking as handled', [
+                'id' => $pendingSync->id,
+                'model' => $pendingSync->modelClass,
+                'model_id' => $pendingSync->modelId,
+            ]);
+
+            return ['success' => true, 'error' => null];
         }
 
         return match ($pendingSync->operation) {
@@ -190,56 +200,82 @@ class PendingSyncManager
         };
     }
 
-    protected function retrySyncAs(string $did, Model $model): bool
+    /**
+     * @return array{success: bool, error: ?string}
+     */
+    protected function retrySyncAs(string $did, Model $model): array
     {
-        return $this->syncService->syncAs($did, $model)->isSuccess();
+        $result = $this->syncService->syncAs($did, $model);
+
+        return ['success' => $result->isSuccess(), 'error' => $result->error];
     }
 
-    protected function retryResync(Model $model): bool
+    /**
+     * @return array{success: bool, error: ?string}
+     */
+    protected function retryResync(Model $model): array
     {
-        return $this->syncService->resync($model)->isSuccess();
+        $result = $this->syncService->resync($model);
+
+        return ['success' => $result->isSuccess(), 'error' => $result->error];
     }
 
-    protected function retryUnsync(Model $model): bool
+    /**
+     * @return array{success: bool, error: ?string}
+     */
+    protected function retryUnsync(Model $model): array
     {
-        return $this->syncService->unsync($model);
+        $success = $this->syncService->unsync($model);
+
+        return ['success' => $success, 'error' => $success ? null : 'Failed to unsync'];
     }
 
-    protected function retrySyncWithReference(PendingSync $pendingSync, Model $model): bool
+    /**
+     * @return array{success: bool, error: ?string}
+     */
+    protected function retrySyncWithReference(PendingSync $pendingSync, Model $model): array
     {
         $mapper = $this->resolveReferenceMapper($pendingSync);
 
         if (! $mapper) {
-            return false;
+            return ['success' => false, 'error' => "Reference mapper not found: {$pendingSync->referenceMapperClass}"];
         }
 
-        return $this->referenceSyncService
-            ->syncWithReference($pendingSync->did, $model, $mapper)
-            ->isSuccess();
+        $result = $this->referenceSyncService->syncWithReference($pendingSync->did, $model, $mapper);
+
+        return ['success' => $result->isSuccess(), 'error' => $result->error];
     }
 
-    protected function retryResyncWithReference(PendingSync $pendingSync, Model $model): bool
+    /**
+     * @return array{success: bool, error: ?string}
+     */
+    protected function retryResyncWithReference(PendingSync $pendingSync, Model $model): array
     {
         $mapper = $this->resolveReferenceMapper($pendingSync);
 
         if (! $mapper) {
-            return false;
+            return ['success' => false, 'error' => "Reference mapper not found: {$pendingSync->referenceMapperClass}"];
         }
 
-        return $this->referenceSyncService
-            ->resyncWithReference($model, $mapper)
-            ->isSuccess();
+        $result = $this->referenceSyncService->resyncWithReference($model, $mapper);
+
+        return ['success' => $result->isSuccess(), 'error' => $result->error];
     }
 
-    protected function retryUnsyncWithReference(PendingSync $pendingSync, Model $model): bool
+    /**
+     * @return array{success: bool, error: ?string}
+     */
+    protected function retryUnsyncWithReference(PendingSync $pendingSync, Model $model): array
     {
         $mapper = $this->resolveReferenceMapper($pendingSync);
 
         if (! $mapper) {
-            return false;
+            return ['success' => false, 'error' => "Reference mapper not found: {$pendingSync->referenceMapperClass}"];
         }
 
-        return $this->referenceSyncService->unsyncWithReference($model, $mapper);
+        $success = $this->referenceSyncService->unsyncWithReference($model, $mapper);
+
+        return ['success' => $success, 'error' => $success ? null : 'Failed to unsync with reference'];
     }
 
     /**
