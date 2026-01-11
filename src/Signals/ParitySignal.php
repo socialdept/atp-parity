@@ -165,7 +165,7 @@ class ParitySignal extends Signal
                 $this->handleDelete($event, $mapper);
             }
         } catch (\Throwable $e) {
-            Log::error('ParitySignal: Error processing event', [
+            Log::error('[Parity:Signal] Error processing event', [
                 'did' => $event->did,
                 'collection' => $commit->collection,
                 'operation' => $commit->operation?->value ?? null,
@@ -236,7 +236,7 @@ class ParitySignal extends Signal
 
             // Validation enabled - treat construction failures as validation failures
             if (config('parity.validation.log_failures', true)) {
-                Log::warning('ParitySignal: Record failed to construct', [
+                Log::warning('[Parity:Signal] Record failed to construct', [
                     'did' => $event->did,
                     'collection' => $commit->collection,
                     'rkey' => $commit->rkey,
@@ -267,6 +267,20 @@ class ParitySignal extends Signal
 
         // Check for existing model and potential conflict
         $existing = $mapper->findByUri($uri);
+
+        // Skip if CID is unchanged - record is already synced
+        if ($existing) {
+            $cidColumn = config('parity.columns.cid', 'atp_cid');
+            $existingCid = $existing->getAttribute($cidColumn);
+
+            if ($existingCid !== null && $existingCid === $commit->cid) {
+                $this->debug('Skipping upsert: CID unchanged (already synced)', $event, [
+                    'cid' => $commit->cid,
+                ]);
+
+                return;
+            }
+        }
 
         // Capture existing blob CIDs before any changes
         $existingBlobs = $existing?->getAttribute('atp_blobs');
@@ -376,7 +390,7 @@ class ParitySignal extends Signal
 
         // Log validation failures if enabled
         if (config('parity.validation.log_failures', true)) {
-            Log::warning('ParitySignal: Record failed validation', [
+            Log::warning('[Parity:Signal] Record failed validation', [
                 'did' => $event->did,
                 'collection' => $event->commit?->collection,
                 'rkey' => $event->commit?->rkey,
@@ -402,7 +416,7 @@ class ParitySignal extends Signal
             return;
         }
 
-        Log::debug("ParitySignal: {$message}", array_merge([
+        Log::debug("[Parity:Signal] {$message}", array_merge([
             'did' => $event?->did,
             'collection' => $event?->commit?->collection,
             'operation' => $event?->commit?->operation?->value ?? null,
@@ -442,7 +456,7 @@ class ParitySignal extends Signal
 
             $model->syncAtpBlobsToMedia($did);
         } catch (\Throwable $e) {
-            Log::warning('ParitySignal: Failed to sync blobs to MediaLibrary', [
+            Log::warning('[Parity:Signal] Failed to sync blobs to MediaLibrary', [
                 'model' => get_class($model),
                 'model_id' => $model->getKey(),
                 'error' => $e->getMessage(),
