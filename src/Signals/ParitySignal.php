@@ -288,7 +288,7 @@ class ParitySignal extends Signal
                 return;
             }
 
-            $this->debug('Conflict resolved', $event, ['resolution' => $resolution->outcome->value]);
+            $this->debug('Conflict resolved', $event, ['resolution' => $resolution->winner]);
 
             // Sync blobs if changed during conflict resolution
             $this->syncBlobsIfChanged($existing, $mapper, $existingBlobs, $event->did);
