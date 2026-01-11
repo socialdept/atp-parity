@@ -13,8 +13,8 @@
     "keywords": ["Laravel", "AT Protocol", "Bluesky", "ATP", "Parity", "Sync"],
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^10.0|^11.0|^12.0",
-        "illuminate/database": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/database": "^11.0|^12.0",
         "socialdept/atp-schema": "^0.3",
         "socialdept/atp-client": "^0.0",
         "socialdept/atp-resolver": "^1.1",
@@ -22,7 +22,7 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0|^11.0",
-        "orchestra/testbench": "^8.0|^9.0|^10.0"
+        "orchestra/testbench": "^9.0|^10.0"
     },
     "autoload": {
         "psr-4": {

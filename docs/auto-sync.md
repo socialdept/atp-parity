@@ -292,13 +292,12 @@ PARITY_PENDING_SYNCS_ENABLED=true
 
 **Cache (default):** Simple, no migration needed. Good for single-server setups.
 
-**Database:** Durable, survives restarts. Required if using queue workers on separate processes. Requires running migrations:
+**Database:** Durable, survives restarts. Required if using queue workers on separate processes. Requires publishing and running the migration:
 
 ```bash
+php artisan vendor:publish --tag=parity-migrations-pending-syncs
 php artisan migrate
 ```
-
-> The migration only creates the table when `storage` is set to `'database'`.
 
 ### Manual Retry in OAuth Callback
 
