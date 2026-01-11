@@ -381,7 +381,7 @@ $post->update(['content' => 'Updated']);         // Updates ATP record
 $post->delete();                                  // Removes from ATP
 ```
 
-See [Automatic Syncing](docs/auto-sync.md) for complete documentation.
+Failed syncs due to expired OAuth sessions can be captured and retried after re-authentication. See [Automatic Syncing](docs/auto-sync.md) for complete documentation including pending sync configuration.
 
 ## Database Migration
 

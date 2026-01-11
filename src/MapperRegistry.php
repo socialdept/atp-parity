@@ -4,6 +4,8 @@ namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordMapper;
+use SocialDept\AtpParity\PendingSync\PendingSyncManager;
+use SocialDept\AtpParity\PendingSync\PendingSyncRetryResult;
 use SocialDept\AtpSchema\Data\Data;
 
 /**
@@ -102,5 +104,35 @@ class MapperRegistry
     public function all(): array
     {
         return array_values($this->byLexicon);
+    }
+
+    /**
+     * Retry all pending syncs for a DID.
+     *
+     * Convenience method that delegates to PendingSyncManager.
+     */
+    public function retryPendingSyncs(string $did): PendingSyncRetryResult
+    {
+        return app(PendingSyncManager::class)->retryForDid($did);
+    }
+
+    /**
+     * Check if a DID has pending syncs.
+     *
+     * Convenience method that delegates to PendingSyncManager.
+     */
+    public function hasPendingSyncs(string $did): bool
+    {
+        return app(PendingSyncManager::class)->hasPendingSyncs($did);
+    }
+
+    /**
+     * Get pending syncs count for a DID.
+     *
+     * Convenience method that delegates to PendingSyncManager.
+     */
+    public function countPendingSyncs(string $did): int
+    {
+        return app(PendingSyncManager::class)->countForDid($did);
     }
 }

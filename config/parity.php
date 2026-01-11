@@ -146,6 +146,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Pending Syncs
+    |--------------------------------------------------------------------------
+    |
+    | Settings for capturing and retrying failed sync operations due to
+    | authentication failures (expired tokens, invalid sessions).
+    |
+    */
+    'pending_syncs' => [
+        // Enable pending sync capture (opt-in)
+        'enabled' => env('PARITY_PENDING_SYNCS_ENABLED', false),
+
+        // Storage driver: 'cache' or 'database'
+        // - cache: Uses Laravel cache (simple, no migration needed)
+        // - database: Uses database table (durable, works with queue workers)
+        'storage' => env('PARITY_PENDING_SYNCS_STORAGE', 'cache'),
+
+        // Time-to-live for pending syncs in seconds (default: 1 hour)
+        'ttl' => env('PARITY_PENDING_SYNCS_TTL', 3600),
+
+        // Maximum retry attempts before discarding
+        'max_attempts' => env('PARITY_PENDING_SYNCS_MAX_ATTEMPTS', 3),
+
+        // Auto-retry when SessionAuthenticated event fires
+        'auto_retry' => env('PARITY_PENDING_SYNCS_AUTO_RETRY', false),
+
+        // Database table name (for database storage)
+        'table' => 'parity_pending_syncs',
+
+        // Cache store to use (for cache storage, null = default)
+        'cache_store' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Collection Discovery
     |--------------------------------------------------------------------------
     |

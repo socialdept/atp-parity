@@ -107,5 +107,21 @@ abstract class TestCase extends Orchestra
             $table->atp();
             $table->timestamps();
         });
+
+        // Pending syncs table
+        Schema::create('parity_pending_syncs', function (Blueprint $table) {
+            $table->id();
+            $table->string('pending_id')->unique();
+            $table->string('did')->index();
+            $table->string('model_class');
+            $table->string('model_id');
+            $table->string('operation');
+            $table->string('reference_mapper_class')->nullable();
+            $table->unsignedInteger('attempts')->default(0);
+            $table->timestamps();
+
+            $table->index(['model_class', 'model_id']);
+            $table->index('created_at');
+        });
     }
 }
