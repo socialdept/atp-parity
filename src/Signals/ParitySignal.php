@@ -268,6 +268,20 @@ class ParitySignal extends Signal
         // Check for existing model and potential conflict
         $existing = $mapper->findByUri($uri);
 
+        // Skip if CID is unchanged - record is already synced
+        if ($existing) {
+            $cidColumn = config('parity.columns.cid', 'atp_cid');
+            $existingCid = $existing->getAttribute($cidColumn);
+
+            if ($existingCid !== null && $existingCid === $commit->cid) {
+                $this->debug('Skipping upsert: CID unchanged (already synced)', $event, [
+                    'cid' => $commit->cid,
+                ]);
+
+                return;
+            }
+        }
+
         // Capture existing blob CIDs before any changes
         $existingBlobs = $existing?->getAttribute('atp_blobs');
 
