@@ -203,9 +203,7 @@ class ParityServiceProvider extends ServiceProvider
             }
 
             $cacheStore = config('parity.pending_syncs.cache_store');
-            $cache = $cacheStore
-                ? $app->make('cache')->store($cacheStore)
-                : $app->make('cache');
+            $cache = $app->make('cache')->store($cacheStore);
 
             return new CachePendingSyncStore(
                 $cache,
