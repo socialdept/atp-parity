@@ -2,6 +2,11 @@
 
 namespace SocialDept\AtpParity\Concerns;
 
+use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpClient\Exceptions\AuthenticationException;
+use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
+use SocialDept\AtpParity\Enums\PendingSyncOperation;
+use SocialDept\AtpParity\PendingSync\PendingSyncManager;
 use SocialDept\AtpParity\Sync\SyncService;
 
 /**
@@ -27,23 +32,65 @@ trait AutoSyncsWithAtp
         static::created(function ($model) {
             if ($model->shouldAutoSync()) {
                 $did = $model->syncAsDid();
+
                 if ($did) {
-                    app(SyncService::class)->syncAs($did, $model);
+                    try {
+                        app(SyncService::class)->syncAs($did, $model);
+                    } catch (OAuthSessionInvalidException|AuthenticationException $e) {
+                        static::capturePendingSync($model, $did, PendingSyncOperation::Sync);
+
+                        throw $e;
+                    }
                 }
             }
         });
 
         static::updated(function ($model) {
             if ($model->isSynced() && $model->shouldAutoSync()) {
-                app(SyncService::class)->resync($model);
+                try {
+                    app(SyncService::class)->resync($model);
+                } catch (OAuthSessionInvalidException|AuthenticationException $e) {
+                    $did = $model->getAtpDid() ?? $model->syncAsDid();
+
+                    if ($did) {
+                        static::capturePendingSync($model, $did, PendingSyncOperation::Resync);
+                    }
+
+                    throw $e;
+                }
             }
         });
 
         static::deleted(function ($model) {
             if ($model->isSynced() && $model->shouldAutoUnsync()) {
-                app(SyncService::class)->unsync($model);
+                try {
+                    app(SyncService::class)->unsync($model);
+                } catch (OAuthSessionInvalidException|AuthenticationException $e) {
+                    $did = $model->getAtpDid() ?? $model->syncAsDid();
+
+                    if ($did) {
+                        static::capturePendingSync($model, $did, PendingSyncOperation::Unsync);
+                    }
+
+                    throw $e;
+                }
             }
         });
+    }
+
+    /**
+     * Capture a pending sync for retry after reauth.
+     */
+    protected static function capturePendingSync(
+        Model $model,
+        string $did,
+        PendingSyncOperation $operation
+    ): void {
+        $manager = app(PendingSyncManager::class);
+
+        if ($manager->isEnabled()) {
+            $manager->capture($did, $model, $operation);
+        }
     }
 
     /**

@@ -2,6 +2,12 @@
 
 namespace SocialDept\AtpParity\Concerns;
 
+use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpClient\Exceptions\AuthenticationException;
+use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
+use SocialDept\AtpParity\Contracts\ReferenceMapper;
+use SocialDept\AtpParity\Enums\PendingSyncOperation;
+use SocialDept\AtpParity\PendingSync\PendingSyncManager;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
 
 /**
@@ -30,7 +36,18 @@ trait AutoSyncsWithReference
                 $mapper = $model->getReferenceMapper();
 
                 if ($did && $mapper) {
-                    app(ReferenceSyncService::class)->syncWithReference($did, $model, $mapper);
+                    try {
+                        app(ReferenceSyncService::class)->syncWithReference($did, $model, $mapper);
+                    } catch (OAuthSessionInvalidException|AuthenticationException $e) {
+                        static::capturePendingSyncWithReference(
+                            $model,
+                            $did,
+                            PendingSyncOperation::SyncWithReference,
+                            $mapper
+                        );
+
+                        throw $e;
+                    }
                 }
             }
         });
@@ -40,8 +57,23 @@ trait AutoSyncsWithReference
                 $mapper = $model->getReferenceMapper();
 
                 if ($mapper) {
-                    // Resync BOTH main and reference records
-                    app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
+                    try {
+                        // Resync BOTH main and reference records
+                        app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
+                    } catch (OAuthSessionInvalidException|AuthenticationException $e) {
+                        $did = $model->getAtpDid() ?? $model->syncAsDid();
+
+                        if ($did) {
+                            static::capturePendingSyncWithReference(
+                                $model,
+                                $did,
+                                PendingSyncOperation::ResyncWithReference,
+                                $mapper
+                            );
+                        }
+
+                        throw $e;
+                    }
                 }
             }
         });
@@ -51,10 +83,41 @@ trait AutoSyncsWithReference
                 $mapper = $model->getReferenceMapper();
 
                 if ($mapper) {
-                    app(ReferenceSyncService::class)->unsyncWithReference($model, $mapper);
+                    try {
+                        app(ReferenceSyncService::class)->unsyncWithReference($model, $mapper);
+                    } catch (OAuthSessionInvalidException|AuthenticationException $e) {
+                        $did = $model->getAtpDid() ?? $model->syncAsDid();
+
+                        if ($did) {
+                            static::capturePendingSyncWithReference(
+                                $model,
+                                $did,
+                                PendingSyncOperation::UnsyncWithReference,
+                                $mapper
+                            );
+                        }
+
+                        throw $e;
+                    }
                 }
             }
         });
+    }
+
+    /**
+     * Capture a pending sync for retry after reauth.
+     */
+    protected static function capturePendingSyncWithReference(
+        Model $model,
+        string $did,
+        PendingSyncOperation $operation,
+        ReferenceMapper $mapper
+    ): void {
+        $manager = app(PendingSyncManager::class);
+
+        if ($manager->isEnabled()) {
+            $manager->capture($did, $model, $operation, $mapper);
+        }
     }
 
     /**
