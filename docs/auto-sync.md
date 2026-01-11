@@ -255,6 +255,147 @@ if (!$post->hasAtpRecord()) {
 }
 ```
 
+## Pending Syncs (Retry After Re-Authentication)
+
+When auto-sync fails due to an expired or invalid OAuth session, the sync operation can be captured and retried after the user re-authenticates. This is opt-in and disabled by default.
+
+### Enabling Pending Syncs
+
+```env
+PARITY_PENDING_SYNCS_ENABLED=true
+```
+
+### Configuration
+
+```php
+// config/parity.php
+'pending_syncs' => [
+    // Enable the feature
+    'enabled' => env('PARITY_PENDING_SYNCS_ENABLED', false),
+
+    // Storage driver: 'cache' (default) or 'database'
+    // Use 'database' for durability with queue workers
+    'storage' => env('PARITY_PENDING_SYNCS_STORAGE', 'cache'),
+
+    // How long to keep pending syncs (seconds)
+    'ttl' => env('PARITY_PENDING_SYNCS_TTL', 3600), // 1 hour
+
+    // Max retry attempts before discarding
+    'max_attempts' => env('PARITY_PENDING_SYNCS_MAX_ATTEMPTS', 3),
+
+    // Auto-retry when user re-authenticates
+    'auto_retry' => env('PARITY_PENDING_SYNCS_AUTO_RETRY', false),
+],
+```
+
+### Storage Options
+
+**Cache (default):** Simple, no migration needed. Good for single-server setups.
+
+**Database:** Durable, survives restarts. Required if using queue workers on separate processes. Requires running migrations:
+
+```bash
+php artisan migrate
+```
+
+> The migration only creates the table when `storage` is set to `'database'`.
+
+### Manual Retry in OAuth Callback
+
+```php
+use SocialDept\AtpParity\Facades\Parity;
+
+public function handleOAuthCallback(Request $request)
+{
+    $session = Atp::oauth()->handleCallback($request);
+
+    // Retry any pending syncs for this user
+    if (Parity::hasPendingSyncs($session->did)) {
+        $result = Parity::retryPendingSyncs($session->did);
+
+        if ($result->hasFailures()) {
+            Log::warning('Some syncs failed', ['errors' => $result->errors]);
+        }
+    }
+
+    return redirect()->route('home');
+}
+```
+
+### Auto-Retry on Re-Authentication
+
+Enable automatic retry when the `SessionAuthenticated` event fires:
+
+```env
+PARITY_PENDING_SYNCS_AUTO_RETRY=true
+```
+
+This registers a listener that automatically retries pending syncs whenever a user successfully authenticates via OAuth.
+
+### Events
+
+Listen to pending sync events for observability:
+
+```php
+use SocialDept\AtpParity\Events\PendingSyncCaptured;
+use SocialDept\AtpParity\Events\PendingSyncRetried;
+use SocialDept\AtpParity\Events\PendingSyncFailed;
+
+// When a sync is captured for later retry
+Event::listen(PendingSyncCaptured::class, function ($event) {
+    Log::info('Sync pending', [
+        'did' => $event->pendingSync->did,
+        'model' => $event->pendingSync->modelClass,
+    ]);
+});
+
+// When a pending sync is retried
+Event::listen(PendingSyncRetried::class, function ($event) {
+    Log::info('Sync retried', [
+        'success' => $event->success,
+        'id' => $event->pendingSync->id,
+    ]);
+});
+
+// When a retry fails with a non-auth exception
+Event::listen(PendingSyncFailed::class, function ($event) {
+    Log::error('Sync failed', [
+        'error' => $event->exception->getMessage(),
+    ]);
+});
+```
+
+### Checking Pending Syncs
+
+```php
+use SocialDept\AtpParity\Facades\Parity;
+
+// Check if user has pending syncs
+Parity::hasPendingSyncs($did);
+
+// Count pending syncs
+Parity::countPendingSyncs($did);
+
+// Get all pending syncs for a DID
+$pending = app(PendingSyncManager::class)->forDid($did);
+```
+
+### How It Works
+
+1. Auto-sync operation fails with `AuthenticationException` or `OAuthSessionInvalidException`
+2. The pending sync is captured (model class, ID, operation type)
+3. The auth exception is re-thrown (so your app can redirect to OAuth)
+4. User re-authenticates via OAuth
+5. Pending syncs are retried (manually or automatically)
+6. Successful syncs are removed; failed syncs remain for next attempt
+
+### Edge Cases
+
+- **Deleted models:** If a model is deleted before retry, the pending sync is considered "handled" and removed
+- **Max attempts:** After exceeding `max_attempts`, the pending sync is discarded
+- **TTL expiry:** Expired pending syncs are cleaned up (call `Parity::cleanupPendingSyncs()` periodically or use database storage which handles this automatically)
+- **Auth still invalid:** If retry fails with another auth exception, it bubbles up for another re-auth cycle
+
 ## Manual Sync
 
 You can also trigger sync manually using methods from `PublishesRecords`:
