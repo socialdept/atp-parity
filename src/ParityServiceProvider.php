@@ -293,25 +293,26 @@ class ParityServiceProvider extends ServiceProvider
     protected function publishMigrations(): void
     {
         $migrationPath = __DIR__.'/../database/migrations';
+        $date = date('Y_m_d');
 
         // Core migration (import states) - always needed
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_import_states_table.php',
+            $migrationPath.'/create_parity_import_states_table.php' => database_path("migrations/{$date}_000001_create_parity_import_states_table.php"),
         ], 'parity-migrations');
 
         // Optional: Manual conflict resolution (strategy = 'manual')
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_conflicts_table.php',
+            $migrationPath.'/create_parity_conflicts_table.php' => database_path("migrations/{$date}_000002_create_parity_conflicts_table.php"),
         ], 'parity-migrations-conflicts');
 
         // Optional: Filesystem blob storage (storage_driver = 'filesystem')
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_blob_mappings_table.php',
+            $migrationPath.'/create_parity_blob_mappings_table.php' => database_path("migrations/{$date}_000003_create_parity_blob_mappings_table.php"),
         ], 'parity-migrations-blobs');
 
         // Optional: Database pending sync storage (storage = 'database')
         $this->publishesMigrations([
-            $migrationPath.'/create_parity_pending_syncs_table.php',
+            $migrationPath.'/create_parity_pending_syncs_table.php' => database_path("migrations/{$date}_000004_create_parity_pending_syncs_table.php"),
         ], 'parity-migrations-pending-syncs');
     }
 
