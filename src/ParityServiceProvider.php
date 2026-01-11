@@ -3,6 +3,7 @@
 namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use SocialDept\AtpParity\Blob\BlobDownloader;
 use SocialDept\AtpParity\Blob\BlobManager;
@@ -13,13 +14,18 @@ use SocialDept\AtpParity\Commands\ImportCommand;
 use SocialDept\AtpParity\Commands\ImportStatusCommand;
 use SocialDept\AtpParity\Commands\MakeMapperCommand;
 use SocialDept\AtpParity\Contracts\BlobStorage;
+use SocialDept\AtpParity\Contracts\PendingSyncStore;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
-use SocialDept\AtpParity\Sync\ReferenceSyncService;
-use SocialDept\AtpParity\Sync\SyncService;
+use SocialDept\AtpParity\Listeners\RetryPendingSyncsOnAuth;
+use SocialDept\AtpParity\PendingSync\CachePendingSyncStore;
+use SocialDept\AtpParity\PendingSync\DatabasePendingSyncStore;
+use SocialDept\AtpParity\PendingSync\PendingSyncManager;
 use SocialDept\AtpParity\Storage\FilesystemBlobStorage;
 use SocialDept\AtpParity\Support\RecordHelper;
+use SocialDept\AtpParity\Sync\ReferenceSyncService;
+use SocialDept\AtpParity\Sync\SyncService;
 
 class ParityServiceProvider extends ServiceProvider
 {
@@ -27,9 +33,32 @@ class ParityServiceProvider extends ServiceProvider
     {
         $this->registerBlueprintMacros();
         $this->registerConfiguredMappers();
+        $this->registerPendingSyncListener();
 
         if ($this->app->runningInConsole()) {
             $this->bootForConsole();
+        }
+    }
+
+    /**
+     * Register auto-retry listener for pending syncs.
+     */
+    protected function registerPendingSyncListener(): void
+    {
+        if (! config('parity.pending_syncs.enabled', false)) {
+            return;
+        }
+
+        if (! config('parity.pending_syncs.auto_retry', false)) {
+            return;
+        }
+
+        // Only register if atp-client's SessionAuthenticated event exists
+        if (class_exists(\SocialDept\AtpClient\Events\SessionAuthenticated::class)) {
+            Event::listen(
+                \SocialDept\AtpClient\Events\SessionAuthenticated::class,
+                RetryPendingSyncsOnAuth::class
+            );
         }
     }
 
@@ -158,6 +187,40 @@ class ParityServiceProvider extends ServiceProvider
         });
 
         $this->registerBlobServices();
+        $this->registerPendingSyncServices();
+    }
+
+    /**
+     * Register pending sync services.
+     */
+    protected function registerPendingSyncServices(): void
+    {
+        $this->app->singleton(PendingSyncStore::class, function ($app) {
+            $storage = config('parity.pending_syncs.storage', 'cache');
+
+            if ($storage === 'database') {
+                return new DatabasePendingSyncStore;
+            }
+
+            $cacheStore = config('parity.pending_syncs.cache_store');
+            $cache = $cacheStore
+                ? $app->make('cache')->store($cacheStore)
+                : $app->make('cache');
+
+            return new CachePendingSyncStore(
+                $cache,
+                config('parity.pending_syncs.ttl', 3600)
+            );
+        });
+
+        $this->app->singleton(PendingSyncManager::class, function ($app) {
+            return new PendingSyncManager(
+                $app->make(PendingSyncStore::class),
+                $app->make(SyncService::class),
+                $app->make(ReferenceSyncService::class),
+                $app->make(MapperRegistry::class)
+            );
+        });
     }
 
     /**
@@ -241,6 +304,8 @@ class ParityServiceProvider extends ServiceProvider
             BlobDownloader::class,
             BlobUploader::class,
             BlobManager::class,
+            PendingSyncStore::class,
+            PendingSyncManager::class,
         ];
     }
 }
