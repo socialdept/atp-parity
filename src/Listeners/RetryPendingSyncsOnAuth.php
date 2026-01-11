@@ -29,7 +29,7 @@ class RetryPendingSyncsOnAuth
     public function handle(SessionAuthenticated $event): void
     {
         if (! $this->manager->isEnabled()) {
-            $this->log('debug', 'Pending syncs feature is disabled, skipping retry');
+            self::log('debug', 'Pending syncs feature is disabled, skipping retry');
 
             return;
         }
@@ -37,14 +37,14 @@ class RetryPendingSyncsOnAuth
         $did = $event->token->did;
 
         if (! $this->manager->hasPendingSyncs($did)) {
-            $this->log('debug', 'No pending syncs found for DID', ['did' => $did]);
+            self::log('debug', 'No pending syncs found for DID', ['did' => $did]);
 
             return;
         }
 
         $count = $this->manager->countForDid($did);
 
-        $this->log('info', 'Scheduling pending syncs retry after response', [
+        self::log('info', 'Scheduling pending syncs retry after response', [
             'did' => $did,
             'count' => $count,
         ]);
@@ -52,19 +52,24 @@ class RetryPendingSyncsOnAuth
         // Defer the retry until after the HTTP response completes.
         // This ensures the new tokens have been saved to the database
         // before we attempt to use them for sync operations.
-        dispatch(function () use ($did) {
-            $this->retryPendingSyncs($did);
+        //
+        // Note: We use a static method to avoid capturing $this in the closure,
+        // which would cause serialization issues with the sync queue driver.
+        dispatch(static function () use ($did) {
+            self::retryPendingSyncs($did);
         })->afterResponse();
     }
 
     /**
      * Perform the actual retry of pending syncs.
+     *
+     * This is static to avoid serialization issues when captured in closures.
      */
-    protected function retryPendingSyncs(string $did): void
+    protected static function retryPendingSyncs(string $did): void
     {
         $manager = app(PendingSyncManager::class);
 
-        $this->log('info', 'Retrying pending syncs after reauth', [
+        self::log('info', 'Retrying pending syncs after reauth', [
             'did' => $did,
             'count' => $manager->countForDid($did),
         ]);
@@ -72,7 +77,7 @@ class RetryPendingSyncsOnAuth
         try {
             $result = $manager->retryForDid($did);
 
-            $this->log('info', 'Pending syncs retry completed', [
+            self::log('info', 'Pending syncs retry completed', [
                 'did' => $did,
                 'total' => $result->total,
                 'succeeded' => $result->succeeded,
@@ -80,7 +85,7 @@ class RetryPendingSyncsOnAuth
                 'skipped' => $result->skipped,
             ]);
         } catch (Throwable $e) {
-            $this->log('error', 'Pending syncs retry failed with exception', [
+            self::log('error', 'Pending syncs retry failed with exception', [
                 'did' => $did,
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
@@ -90,8 +95,10 @@ class RetryPendingSyncsOnAuth
 
     /**
      * Log a message if logging is enabled.
+     *
+     * This is static to support being called from static context.
      */
-    protected function log(string $level, string $message, array $context = []): void
+    protected static function log(string $level, string $message, array $context = []): void
     {
         if (config('parity.pending_syncs.log', false)) {
             Log::{$level}("[Parity] {$message}", $context);
