@@ -12,6 +12,10 @@ use Throwable;
  *
  * This listener is only registered when both pending_syncs.enabled
  * and pending_syncs.auto_retry are set to true in config.
+ *
+ * The retry is deferred until after the HTTP response completes to ensure
+ * that the new tokens have been saved to the database before attempting
+ * to use them for sync operations.
  */
 class RetryPendingSyncsOnAuth
 {
@@ -40,13 +44,33 @@ class RetryPendingSyncsOnAuth
 
         $count = $this->manager->countForDid($did);
 
-        $this->log('info', 'Retrying pending syncs after reauth', [
+        $this->log('info', 'Scheduling pending syncs retry after response', [
             'did' => $did,
             'count' => $count,
         ]);
 
+        // Defer the retry until after the HTTP response completes.
+        // This ensures the new tokens have been saved to the database
+        // before we attempt to use them for sync operations.
+        dispatch(function () use ($did) {
+            $this->retryPendingSyncs($did);
+        })->afterResponse();
+    }
+
+    /**
+     * Perform the actual retry of pending syncs.
+     */
+    protected function retryPendingSyncs(string $did): void
+    {
+        $manager = app(PendingSyncManager::class);
+
+        $this->log('info', 'Retrying pending syncs after reauth', [
+            'did' => $did,
+            'count' => $manager->countForDid($did),
+        ]);
+
         try {
-            $result = $this->manager->retryForDid($did);
+            $result = $manager->retryForDid($did);
 
             $this->log('info', 'Pending syncs retry completed', [
                 'did' => $did,
