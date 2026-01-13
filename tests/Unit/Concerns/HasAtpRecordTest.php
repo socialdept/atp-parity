@@ -188,4 +188,11 @@ class HasAtpRecordTest extends TestCase
 
         $this->assertNull($found);
     }
+
+    public function test_get_desired_atp_rkey_returns_null_by_default(): void
+    {
+        $model = new TestModel(['content' => 'Test']);
+
+        $this->assertNull($model->getDesiredAtpRkey());
+    }
 }

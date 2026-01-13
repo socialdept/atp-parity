@@ -92,6 +92,17 @@ trait HasAtpRecord
     }
 
     /**
+     * Get the desired rkey for new records.
+     *
+     * Return null to let AT Protocol generate one automatically.
+     * Override this method to provide custom rkeys (e.g., UUIDs, slugs).
+     */
+    public function getDesiredAtpRkey(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Check if this model has been synced to AT Protocol.
      */
     public function hasAtpRecord(): bool

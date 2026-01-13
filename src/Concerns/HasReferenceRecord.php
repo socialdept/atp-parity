@@ -126,6 +126,17 @@ trait HasReferenceRecord
     }
 
     /**
+     * Get the desired rkey for reference records.
+     *
+     * Return null to let AT Protocol generate one automatically.
+     * Override this method to provide custom reference rkeys.
+     */
+    public function getDesiredAtpReferenceRkey(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Scope to query models that have reference records.
      */
     public function scopeWithReferenceRecord($query)

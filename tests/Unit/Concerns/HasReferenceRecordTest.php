@@ -193,4 +193,11 @@ class HasReferenceRecordTest extends TestCase
         $this->assertCount(1, $fullySynced);
         $this->assertSame('Fully Synced', $fullySynced->first()->title);
     }
+
+    public function test_get_desired_atp_reference_rkey_returns_null_by_default(): void
+    {
+        $model = new ReferenceModel(['title' => 'Test']);
+
+        $this->assertNull($model->getDesiredAtpReferenceRkey());
+    }
 }
