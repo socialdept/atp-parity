@@ -119,6 +119,7 @@ class ReferenceSyncService
             $response = $client->atproto->repo->createRecord(
                 collection: $collection,
                 record: $record->toArray(),
+                rkey: method_exists($model, 'getDesiredAtpReferenceRkey') ? $model->getDesiredAtpReferenceRkey() : null,
                 validate: config('parity.sync.validate', true),
             );
 

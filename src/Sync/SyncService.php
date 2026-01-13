@@ -71,6 +71,7 @@ class SyncService
             $response = $client->atproto->repo->createRecord(
                 collection: $collection,
                 record: $record->toArray(),
+                rkey: method_exists($model, 'getDesiredAtpRkey') ? $model->getDesiredAtpRkey() : null,
                 validate: config('parity.sync.validate', true),
             );
 

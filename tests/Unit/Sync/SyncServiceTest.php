@@ -201,6 +201,29 @@ class SyncServiceTest extends TestCase
         $this->assertStringContainsString('Invalid AT Protocol URI', $result->error);
     }
 
+    public function test_model_with_custom_rkey_returns_expected_value(): void
+    {
+        // Create a model with custom rkey implementation
+        $model = new class(['content' => 'Test']) extends TestModel
+        {
+            public function getDesiredAtpRkey(): ?string
+            {
+                return 'my-custom-rkey';
+            }
+        };
+
+        // Verify the model returns the expected rkey
+        $this->assertSame('my-custom-rkey', $model->getDesiredAtpRkey());
+    }
+
+    public function test_default_model_returns_null_rkey(): void
+    {
+        $model = new TestModel(['content' => 'Test']);
+
+        // Verify the default implementation returns null
+        $this->assertNull($model->getDesiredAtpRkey());
+    }
+
     /**
      * Mock AtpClient for create operations.
      */
@@ -296,4 +319,5 @@ class SyncServiceTest extends TestCase
 
         $this->app->instance('atp-client', $manager);
     }
+
 }
