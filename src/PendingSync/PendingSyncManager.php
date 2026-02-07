@@ -36,7 +36,7 @@ class PendingSyncManager
      */
     public function isEnabled(): bool
     {
-        return (bool) config('parity.pending_syncs.enabled', false);
+        return (bool) config('atp-parity.pending_syncs.enabled', false);
     }
 
     /**
@@ -83,7 +83,7 @@ class PendingSyncManager
     public function retryForDid(string $did): PendingSyncRetryResult
     {
         $pending = $this->store->forDid($did);
-        $maxAttempts = config('parity.pending_syncs.max_attempts', 3);
+        $maxAttempts = config('atp-parity.pending_syncs.max_attempts', 3);
 
         $succeeded = 0;
         $failed = 0;
@@ -354,7 +354,7 @@ class PendingSyncManager
      */
     protected function log(string $level, string $message, array $context = []): void
     {
-        if (config('parity.pending_syncs.log', false)) {
+        if (config('atp-parity.pending_syncs.log', false)) {
             Log::{$level}("[Parity] {$message}", $context);
         }
     }

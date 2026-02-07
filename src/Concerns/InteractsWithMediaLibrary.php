@@ -258,7 +258,7 @@ trait InteractsWithMediaLibrary
      */
     protected function usesMediaLibraryStorage(): bool
     {
-        return config('parity.blobs.storage_driver', BlobStorageDriver::Filesystem) === BlobStorageDriver::MediaLibrary;
+        return config('atp-parity.blobs.storage_driver', BlobStorageDriver::Filesystem) === BlobStorageDriver::MediaLibrary;
     }
 
     /**

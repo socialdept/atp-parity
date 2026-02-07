@@ -6,6 +6,7 @@ use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpSchema\Data\Data;
+use SocialDept\AtpSupport\AtUri;
 
 /**
  * Trait for Eloquent models that map to AT Protocol records.
@@ -19,7 +20,7 @@ trait HasAtpRecord
      */
     public function getAtpUri(): ?string
     {
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $this->getAttribute($column);
     }
@@ -29,7 +30,7 @@ trait HasAtpRecord
      */
     public function getAtpCid(): ?string
     {
-        $column = config('parity.columns.cid', 'atp_cid');
+        $column = config('atp-parity.columns.cid', 'atp_cid');
 
         return $this->getAttribute($column);
     }
@@ -39,18 +40,7 @@ trait HasAtpRecord
      */
     public function getAtpDid(): ?string
     {
-        $uri = $this->getAtpUri();
-
-        if (! $uri) {
-            return null;
-        }
-
-        // at://did:plc:xxx/app.bsky.feed.post/rkey
-        if (preg_match('#^at://([^/]+)/#', $uri, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
+        return AtUri::parse($this->getAtpUri() ?? '')?->did;
     }
 
     /**
@@ -58,18 +48,7 @@ trait HasAtpRecord
      */
     public function getAtpCollection(): ?string
     {
-        $uri = $this->getAtpUri();
-
-        if (! $uri) {
-            return null;
-        }
-
-        // at://did:plc:xxx/app.bsky.feed.post/rkey
-        if (preg_match('#^at://[^/]+/([^/]+)/#', $uri, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
+        return AtUri::parse($this->getAtpUri() ?? '')?->collection;
     }
 
     /**
@@ -77,18 +56,7 @@ trait HasAtpRecord
      */
     public function getAtpRkey(): ?string
     {
-        $uri = $this->getAtpUri();
-
-        if (! $uri) {
-            return null;
-        }
-
-        // at://did:plc:xxx/app.bsky.feed.post/rkey
-        if (preg_match('#^at://[^/]+/[^/]+/([^/]+)$#', $uri, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
+        return AtUri::parse($this->getAtpUri() ?? '')?->rkey;
     }
 
     /**
@@ -146,7 +114,7 @@ trait HasAtpRecord
      */
     public function scopeWithAtpRecord($query)
     {
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $query->whereNotNull($column);
     }
@@ -156,7 +124,7 @@ trait HasAtpRecord
      */
     public function scopeWithoutAtpRecord($query)
     {
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $query->whereNull($column);
     }
@@ -166,7 +134,7 @@ trait HasAtpRecord
      */
     public function scopeWhereAtpUri($query, string $uri)
     {
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $query->where($column, $uri);
     }

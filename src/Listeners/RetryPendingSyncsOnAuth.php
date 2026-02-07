@@ -100,7 +100,7 @@ class RetryPendingSyncsOnAuth
      */
     protected static function log(string $level, string $message, array $context = []): void
     {
-        if (config('parity.pending_syncs.log', false)) {
+        if (config('atp-parity.pending_syncs.log', false)) {
             Log::{$level}("[Parity] {$message}", $context);
         }
     }

@@ -22,12 +22,12 @@ use SocialDept\AtpSignals\Signals\Signal;
  * Eloquent models.
  *
  * Supports selective sync via configuration or by extending this class:
- * - Filter by DID: config('parity.sync.dids') or override dids()
- * - Filter by operation: config('parity.sync.operations') or override operations()
- * - Custom filter: config('parity.sync.filter') or override shouldSync()
+ * - Filter by DID: config('atp-parity.sync.dids') or override dids()
+ * - Filter by operation: config('atp-parity.sync.operations') or override operations()
+ * - Custom filter: config('atp-parity.sync.filter') or override shouldSync()
  *
  * Supports conflict resolution via configuration:
- * - Strategy: config('parity.conflicts.strategy') - 'remote', 'local', 'newest', 'manual'
+ * - Strategy: config('atp-parity.conflicts.strategy') - 'remote', 'local', 'newest', 'manual'
  *
  * To use this signal, register it in your atp-signals config:
  *
@@ -77,7 +77,7 @@ class ParitySignal extends Signal
      */
     public function dids(): ?array
     {
-        return config('parity.sync.dids');
+        return config('atp-parity.sync.dids');
     }
 
     /**
@@ -88,7 +88,7 @@ class ParitySignal extends Signal
      */
     public function operations(): ?array
     {
-        return config('parity.sync.operations');
+        return config('atp-parity.sync.operations');
     }
 
     /**
@@ -99,7 +99,7 @@ class ParitySignal extends Signal
     public function shouldSync(SignalEvent $event): bool
     {
         // Check custom filter callback from config
-        $filter = config('parity.sync.filter');
+        $filter = config('atp-parity.sync.filter');
         if ($filter && is_callable($filter)) {
             return $filter($event);
         }
@@ -235,7 +235,7 @@ class ParitySignal extends Signal
             }
 
             // Validation enabled - treat construction failures as validation failures
-            if (config('parity.validation.log_failures', true)) {
+            if (config('atp-parity.validation.log_failures', true)) {
                 Log::warning('[Parity:Signal] Record failed to construct', [
                     'did' => $event->did,
                     'collection' => $commit->collection,
@@ -270,7 +270,7 @@ class ParitySignal extends Signal
 
         // Skip if CID is unchanged - record is already synced
         if ($existing) {
-            $cidColumn = config('parity.columns.cid', 'atp_cid');
+            $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
             $existingCid = $existing->getAttribute($cidColumn);
 
             if ($existingCid !== null && $existingCid === $commit->cid) {
@@ -351,7 +351,7 @@ class ParitySignal extends Signal
      */
     protected function getValidationMode(RecordMapper $mapper): ?ValidationMode
     {
-        $configMode = config('parity.validation.mode');
+        $configMode = config('atp-parity.validation.mode');
 
         return $mapper->validationMode() ?? match (true) {
             $configMode instanceof ValidationMode => $configMode,
@@ -389,7 +389,7 @@ class ParitySignal extends Signal
         }
 
         // Log validation failures if enabled
-        if (config('parity.validation.log_failures', true)) {
+        if (config('atp-parity.validation.log_failures', true)) {
             Log::warning('[Parity:Signal] Record failed validation', [
                 'did' => $event->did,
                 'collection' => $event->commit?->collection,

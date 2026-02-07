@@ -29,7 +29,7 @@ class ConflictStrategyTest extends TestCase
 
     public function test_from_config_returns_remote_wins_by_default(): void
     {
-        config()->set('parity.conflicts.strategy', 'remote');
+        config()->set('atp-parity.conflicts.strategy', 'remote');
 
         $strategy = ConflictStrategy::fromConfig();
 
@@ -38,7 +38,7 @@ class ConflictStrategyTest extends TestCase
 
     public function test_from_config_returns_local_wins(): void
     {
-        config()->set('parity.conflicts.strategy', 'local');
+        config()->set('atp-parity.conflicts.strategy', 'local');
 
         $strategy = ConflictStrategy::fromConfig();
 
@@ -47,7 +47,7 @@ class ConflictStrategyTest extends TestCase
 
     public function test_from_config_returns_newest_wins(): void
     {
-        config()->set('parity.conflicts.strategy', 'newest');
+        config()->set('atp-parity.conflicts.strategy', 'newest');
 
         $strategy = ConflictStrategy::fromConfig();
 
@@ -56,7 +56,7 @@ class ConflictStrategyTest extends TestCase
 
     public function test_from_config_returns_manual(): void
     {
-        config()->set('parity.conflicts.strategy', 'manual');
+        config()->set('atp-parity.conflicts.strategy', 'manual');
 
         $strategy = ConflictStrategy::fromConfig();
 
@@ -65,7 +65,7 @@ class ConflictStrategyTest extends TestCase
 
     public function test_from_config_defaults_to_remote_wins_for_invalid_value(): void
     {
-        config()->set('parity.conflicts.strategy', 'invalid');
+        config()->set('atp-parity.conflicts.strategy', 'invalid');
 
         $strategy = ConflictStrategy::fromConfig();
 
@@ -74,7 +74,7 @@ class ConflictStrategyTest extends TestCase
 
     public function test_from_config_defaults_to_remote_wins_when_not_set(): void
     {
-        config()->set('parity.conflicts.strategy', null);
+        config()->set('atp-parity.conflicts.strategy', null);
 
         $strategy = ConflictStrategy::fromConfig();
 

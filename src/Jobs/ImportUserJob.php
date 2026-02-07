@@ -30,7 +30,7 @@ class ImportUserJob implements ShouldQueue
         public string $did,
         public ?string $collection = null,
     ) {
-        $this->onQueue(config('parity.import.queue', 'default'));
+        $this->onQueue(config('atp-parity.import.queue', 'default'));
     }
 
     public function handle(ImportService $service): void

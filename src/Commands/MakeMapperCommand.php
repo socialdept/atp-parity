@@ -28,7 +28,7 @@ class MakeMapperCommand extends GeneratorCommand
 
     protected function getDefaultNamespace($rootNamespace): string
     {
-        $path = config('parity.generators.mapper_path', 'app/AtpMappers');
+        $path = config('atp-parity.generators.mapper_path', 'app/AtpMappers');
 
         // Convert path to namespace (app/AtpMappers -> App\AtpMappers)
         $namespace = str_replace('/', '\\', $path);
@@ -40,7 +40,7 @@ class MakeMapperCommand extends GeneratorCommand
     protected function getPath($name): string
     {
         $name = str_replace('\\', '/', str_replace($this->rootNamespace(), '', $name));
-        $path = config('parity.generators.mapper_path', 'app/AtpMappers');
+        $path = config('atp-parity.generators.mapper_path', 'app/AtpMappers');
 
         return base_path($path).'/'.trim($name, '/').'.php';
     }

@@ -45,11 +45,11 @@ class ParityServiceProvider extends ServiceProvider
      */
     protected function registerPendingSyncListener(): void
     {
-        if (! config('parity.pending_syncs.enabled', false)) {
+        if (! config('atp-parity.pending_syncs.enabled', false)) {
             return;
         }
 
-        if (! config('parity.pending_syncs.auto_retry', false)) {
+        if (! config('atp-parity.pending_syncs.auto_retry', false)) {
             return;
         }
 
@@ -76,9 +76,9 @@ class ParityServiceProvider extends ServiceProvider
          */
         Blueprint::macro('atp', function () {
             /** @var Blueprint $this */
-            $uriColumn = config('parity.columns.uri', 'atp_uri');
-            $cidColumn = config('parity.columns.cid', 'atp_cid');
-            $syncedAtColumn = config('parity.columns.synced_at', 'atp_synced_at');
+            $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+            $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
+            $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
             $this->string($uriColumn)->nullable()->unique();
             $this->string($cidColumn)->nullable();
@@ -95,8 +95,8 @@ class ParityServiceProvider extends ServiceProvider
          */
         Blueprint::macro('atpReference', function (bool $includeCid = true) {
             /** @var Blueprint $this */
-            $uriColumn = config('parity.references.columns.reference_uri', 'atp_reference_uri');
-            $cidColumn = config('parity.references.columns.reference_cid', 'atp_reference_cid');
+            $uriColumn = config('atp-parity.references.columns.reference_uri', 'atp_reference_uri');
+            $cidColumn = config('atp-parity.references.columns.reference_cid', 'atp_reference_cid');
 
             $this->string($uriColumn)->nullable()->unique();
 
@@ -114,9 +114,9 @@ class ParityServiceProvider extends ServiceProvider
          */
         Blueprint::macro('dropAtp', function () {
             /** @var Blueprint $this */
-            $uriColumn = config('parity.columns.uri', 'atp_uri');
-            $cidColumn = config('parity.columns.cid', 'atp_cid');
-            $syncedAtColumn = config('parity.columns.synced_at', 'atp_synced_at');
+            $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+            $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
+            $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
             // Drop unique index first (required for SQLite)
             $this->dropUnique([$uriColumn]);
@@ -133,8 +133,8 @@ class ParityServiceProvider extends ServiceProvider
          */
         Blueprint::macro('dropAtpReference', function (bool $includeCid = true) {
             /** @var Blueprint $this */
-            $uriColumn = config('parity.references.columns.reference_uri', 'atp_reference_uri');
-            $cidColumn = config('parity.references.columns.reference_cid', 'atp_reference_cid');
+            $uriColumn = config('atp-parity.references.columns.reference_uri', 'atp_reference_uri');
+            $cidColumn = config('atp-parity.references.columns.reference_cid', 'atp_reference_cid');
 
             // Drop unique index first (required for SQLite)
             $this->dropUnique([$uriColumn]);
@@ -151,7 +151,7 @@ class ParityServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/parity.php', 'parity');
+        $this->mergeConfigFrom(__DIR__.'/../config/atp-parity.php', 'atp-parity');
 
         $this->app->singleton(MapperRegistry::class);
         $this->app->alias(MapperRegistry::class, 'parity');
@@ -196,18 +196,18 @@ class ParityServiceProvider extends ServiceProvider
     protected function registerPendingSyncServices(): void
     {
         $this->app->singleton(PendingSyncStore::class, function ($app) {
-            $storage = config('parity.pending_syncs.storage', 'cache');
+            $storage = config('atp-parity.pending_syncs.storage', 'cache');
 
             if ($storage === 'database') {
                 return new DatabasePendingSyncStore;
             }
 
-            $cacheStore = config('parity.pending_syncs.cache_store');
+            $cacheStore = config('atp-parity.pending_syncs.cache_store');
             $cache = $app->make('cache')->store($cacheStore);
 
             return new CachePendingSyncStore(
                 $cache,
-                config('parity.pending_syncs.ttl', 3600)
+                config('atp-parity.pending_syncs.ttl', 3600)
             );
         });
 
@@ -228,8 +228,8 @@ class ParityServiceProvider extends ServiceProvider
     {
         $this->app->singleton(BlobStorage::class, function () {
             return new FilesystemBlobStorage(
-                config('parity.blobs.disk'),
-                config('parity.blobs.path', 'atp-blobs')
+                config('atp-parity.blobs.disk'),
+                config('atp-parity.blobs.path', 'atp-blobs')
             );
         });
 
@@ -257,7 +257,7 @@ class ParityServiceProvider extends ServiceProvider
     {
         $registry = $this->app->make(MapperRegistry::class);
 
-        foreach (config('parity.mappers', []) as $mapperClass) {
+        foreach (config('atp-parity.mappers', []) as $mapperClass) {
             if (class_exists($mapperClass)) {
                 $registry->register($this->app->make($mapperClass));
             }
@@ -267,8 +267,8 @@ class ParityServiceProvider extends ServiceProvider
     protected function bootForConsole(): void
     {
         $this->publishes([
-            __DIR__.'/../config/parity.php' => config_path('parity.php'),
-        ], 'parity-config');
+            __DIR__.'/../config/atp-parity.php' => config_path('atp-parity.php'),
+        ], 'atp-parity-config');
 
         $this->publishMigrations();
 

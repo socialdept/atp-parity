@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $table = config('parity.pending_syncs.table', 'parity_pending_syncs');
+        $table = config('atp-parity.pending_syncs.table', 'parity_pending_syncs');
 
         Schema::create($table, function (Blueprint $table) {
             $table->id();
@@ -28,7 +28,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $table = config('parity.pending_syncs.table', 'parity_pending_syncs');
+        $table = config('atp-parity.pending_syncs.table', 'parity_pending_syncs');
 
         Schema::dropIfExists($table);
     }

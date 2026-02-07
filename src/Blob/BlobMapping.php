@@ -49,7 +49,7 @@ class BlobMapping extends Model
 
     public function getTable(): string
     {
-        return config('parity.blobs.table', 'parity_blob_mappings');
+        return config('atp-parity.blobs.table', 'parity_blob_mappings');
     }
 
     /**

@@ -40,7 +40,7 @@ trait HasAtpRelationships
      */
     public function atpBelongsTo(string $related, string $uriColumn, ?string $ownerKey = null): BelongsTo
     {
-        $ownerKey = $ownerKey ?? config('parity.columns.uri', 'atp_uri');
+        $ownerKey = $ownerKey ?? config('atp-parity.columns.uri', 'atp_uri');
 
         // Create a custom BelongsTo that uses URI matching
         return $this->belongsTo($related, $uriColumn, $ownerKey);
@@ -64,7 +64,7 @@ trait HasAtpRelationships
      */
     public function atpHasMany(string $related, string $foreignKey, ?string $localKey = null): HasMany
     {
-        $localKey = $localKey ?? config('parity.columns.uri', 'atp_uri');
+        $localKey = $localKey ?? config('atp-parity.columns.uri', 'atp_uri');
 
         return $this->hasMany($related, $foreignKey, $localKey);
     }
@@ -120,7 +120,7 @@ trait HasAtpRelationships
             return null;
         }
 
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $modelClass::where($column, $uri)->first();
     }

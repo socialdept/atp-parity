@@ -7,7 +7,7 @@ use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Enums\BlobSource;
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Events\BlobDownloaded;
-use SocialDept\AtpResolver\Facades\Resolver;
+use SocialDept\AtpSupport\Facades\Resolver;
 use SocialDept\AtpSchema\Data\BlobReference;
 use Throwable;
 
@@ -33,7 +33,7 @@ class BlobDownloader
         $cid = $blob->getCid();
 
         // Check size limit
-        $maxSize = config('parity.blobs.max_download_size', 10 * 1024 * 1024);
+        $maxSize = config('atp-parity.blobs.max_download_size', 10 * 1024 * 1024);
         if ($blob->getSize() > $maxSize) {
             throw new \RuntimeException("Blob size ({$blob->getSize()}) exceeds maximum ({$maxSize})");
         }
@@ -66,7 +66,7 @@ class BlobDownloader
      */
     public function download(BlobReference $blob, string $did): BlobMapping
     {
-        $driver = config('parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
+        $driver = config('atp-parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
 
         if ($driver === BlobStorageDriver::MediaLibrary) {
             throw new \RuntimeException(

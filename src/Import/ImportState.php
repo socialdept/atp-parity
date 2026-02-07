@@ -55,7 +55,7 @@ class ImportState extends Model
 
     public function getTable(): string
     {
-        return config('parity.import.state_table', 'parity_import_states');
+        return config('atp-parity.import.state_table', 'parity_import_states');
     }
 
     /**

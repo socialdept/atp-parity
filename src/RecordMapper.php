@@ -63,7 +63,7 @@ abstract class RecordMapper implements RecordMapperContract
      */
     protected function uriColumn(): string
     {
-        return config('parity.columns.uri', 'atp_uri');
+        return config('atp-parity.columns.uri', 'atp_uri');
     }
 
     /**
@@ -71,7 +71,7 @@ abstract class RecordMapper implements RecordMapperContract
      */
     protected function cidColumn(): string
     {
-        return config('parity.columns.cid', 'atp_cid');
+        return config('atp-parity.columns.cid', 'atp_cid');
     }
 
     /**
@@ -79,7 +79,7 @@ abstract class RecordMapper implements RecordMapperContract
      */
     protected function syncedAtColumn(): string
     {
-        return config('parity.columns.synced_at', 'atp_synced_at');
+        return config('atp-parity.columns.synced_at', 'atp_synced_at');
     }
 
     public function toModel(Data $record, array $meta = []): Model

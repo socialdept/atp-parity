@@ -126,7 +126,7 @@ class DatabasePendingSyncStoreTest extends TestCase
     public function test_remove_expired_removes_old_entries(): void
     {
         // Set TTL to 1 hour before creating entries
-        $this->app['config']->set('parity.pending_syncs.ttl', 3600);
+        $this->app['config']->set('atp-parity.pending_syncs.ttl', 3600);
 
         // Create an old entry and manually update timestamps
         $old = PendingSyncState::create([

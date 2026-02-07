@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use SocialDept\AtpClient\AtpClientServiceProvider;
 use SocialDept\AtpParity\ParityServiceProvider;
-use SocialDept\AtpResolver\ResolverServiceProvider;
 use SocialDept\AtpSignals\SignalServiceProvider;
+use SocialDept\AtpSupport\AtpSupportServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -22,7 +22,7 @@ abstract class TestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
-            ResolverServiceProvider::class,
+            AtpSupportServiceProvider::class,
             AtpClientServiceProvider::class,
             SignalServiceProvider::class,
             ParityServiceProvider::class,
@@ -38,8 +38,8 @@ abstract class TestCase extends Orchestra
             'prefix' => '',
         ]);
 
-        $app['config']->set('parity.columns.uri', 'atp_uri');
-        $app['config']->set('parity.columns.cid', 'atp_cid');
+        $app['config']->set('atp-parity.columns.uri', 'atp_uri');
+        $app['config']->set('atp-parity.columns.cid', 'atp_cid');
     }
 
     protected function setUpDatabase(): void

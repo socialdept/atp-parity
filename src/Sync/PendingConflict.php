@@ -23,7 +23,7 @@ class PendingConflict extends Model
      */
     public function getTable(): string
     {
-        return config('parity.conflicts.table', 'parity_conflicts');
+        return config('atp-parity.conflicts.table', 'parity_conflicts');
     }
 
     /**

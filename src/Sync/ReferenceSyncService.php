@@ -38,7 +38,7 @@ class ReferenceSyncService
         ReferenceMapper $referenceMapper,
         ?bool $rollbackOnFailure = null
     ): ReferenceSyncResult {
-        $rollbackOnFailure ??= config('parity.references.rollback_on_failure', true);
+        $rollbackOnFailure ??= config('atp-parity.references.rollback_on_failure', true);
 
         $mainMapper = $referenceMapper->mainMapper();
 
@@ -120,7 +120,7 @@ class ReferenceSyncService
                 collection: $collection,
                 record: $record->toArray(),
                 rkey: method_exists($model, 'getDesiredAtpReferenceRkey') ? $model->getDesiredAtpReferenceRkey() : null,
-                validate: config('parity.sync.validate', true),
+                validate: config('atp-parity.sync.validate', true),
             );
 
             // Update model with reference record metadata
@@ -173,7 +173,7 @@ class ReferenceSyncService
         }
 
         // Get current CIDs for comparison
-        $oldMainCid = $model->{config('parity.columns.cid', 'atp_cid')};
+        $oldMainCid = $model->{config('atp-parity.columns.cid', 'atp_cid')};
         $oldReferenceCid = $model->{$referenceMapper->referenceCidColumn()};
 
         // Step 1: Resync main record
@@ -228,7 +228,7 @@ class ReferenceSyncService
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
                 record: $record->toArray(),
-                validate: config('parity.sync.validate', true),
+                validate: config('atp-parity.sync.validate', true),
             );
 
             $this->updateReferenceModelMeta($model, $mapper, $response->uri, $response->cid);
@@ -299,7 +299,7 @@ class ReferenceSyncService
      */
     protected function getMainUri(Model $model): ?string
     {
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $model->{$column};
     }
@@ -317,8 +317,8 @@ class ReferenceSyncService
      */
     protected function setMainRefOnModel(Model $model, StrongRef $ref): void
     {
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
-        $cidColumn = config('parity.columns.cid', 'atp_cid');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+        $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
 
         $model->{$uriColumn} = $ref->uri;
         if ($ref->cid) {
@@ -358,14 +358,16 @@ class ReferenceSyncService
      */
     protected function parseUri(string $uri): ?array
     {
-        if (! preg_match('#^at://([^/]+)/([^/]+)/([^/]+)$#', $uri, $matches)) {
+        $parsed = \SocialDept\AtpSupport\AtUri::parse($uri);
+
+        if (! $parsed) {
             return null;
         }
 
         return [
-            'did' => $matches[1],
-            'collection' => $matches[2],
-            'rkey' => $matches[3],
+            'did' => $parsed->did,
+            'collection' => $parsed->collection,
+            'rkey' => $parsed->rkey,
         ];
     }
 

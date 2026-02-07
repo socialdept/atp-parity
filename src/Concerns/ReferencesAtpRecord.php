@@ -56,8 +56,8 @@ trait ReferencesAtpRecord
             return null;
         }
 
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
-        $cidColumn = config('parity.columns.cid', 'atp_cid');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+        $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
 
         $uri = $main->{$uriColumn};
         $cid = $main->{$cidColumn};
@@ -99,7 +99,7 @@ trait ReferencesAtpRecord
     public function scopeWithSyncedMain($query)
     {
         $mainClass = $this->getMainModelClass();
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
 
         return $query->whereHas('mainModel', function ($q) use ($uriColumn) {
             $q->whereNotNull($uriColumn);
@@ -111,7 +111,7 @@ trait ReferencesAtpRecord
      */
     public function scopeWithoutSyncedMain($query)
     {
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
 
         return $query->whereHas('mainModel', function ($q) use ($uriColumn) {
             $q->whereNull($uriColumn);
