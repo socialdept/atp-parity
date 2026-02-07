@@ -17,8 +17,8 @@ class FilesystemBlobStorage implements BlobStorage
 
     public function __construct(?string $disk = null, ?string $basePath = null)
     {
-        $this->diskName = $disk ?? config('parity.blobs.disk', 'local');
-        $this->basePath = $basePath ?? config('parity.blobs.path', 'atp-blobs');
+        $this->diskName = $disk ?? config('atp-parity.blobs.disk', 'local');
+        $this->basePath = $basePath ?? config('atp-parity.blobs.path', 'atp-blobs');
     }
 
     public function store(string $cid, string $content, string $mimeType): string

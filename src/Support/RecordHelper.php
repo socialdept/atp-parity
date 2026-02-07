@@ -7,8 +7,9 @@ use SocialDept\AtpClient\AtpClient;
 use SocialDept\AtpClient\Data\Responses\Atproto\Repo\GetRecordResponse;
 use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\MapperRegistry;
-use SocialDept\AtpResolver\Facades\Resolver;
 use SocialDept\AtpSchema\Data\Data;
+use SocialDept\AtpSupport\AtUri;
+use SocialDept\AtpSupport\Facades\Resolver;
 
 /**
  * Helper for integrating atp-parity with atp-client.
@@ -193,15 +194,16 @@ class RecordHelper
      */
     protected function parseUri(string $uri): ?array
     {
-        // at://did:plc:xxx/app.bsky.feed.post/rkey
-        if (! preg_match('#^at://([^/]+)/([^/]+)/([^/]+)$#', $uri, $matches)) {
+        $parsed = AtUri::parse($uri);
+
+        if (! $parsed) {
             return null;
         }
 
         return [
-            'repo' => $matches[1],
-            'collection' => $matches[2],
-            'rkey' => $matches[3],
+            'repo' => $parsed->did,
+            'collection' => $parsed->collection,
+            'rkey' => $parsed->rkey,
         ];
     }
 
@@ -210,11 +212,6 @@ class RecordHelper
      */
     protected function extractCollection(string $uri): string
     {
-        // at://did:plc:xxx/app.bsky.feed.post/rkey
-        if (preg_match('#^at://[^/]+/([^/]+)/#', $uri, $matches)) {
-            return $matches[1];
-        }
-
-        return '';
+        return AtUri::parse($uri)?->collection ?? '';
     }
 }

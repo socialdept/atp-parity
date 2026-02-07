@@ -6,7 +6,7 @@ use Illuminate\Http\UploadedFile;
 use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Enums\BlobUrlStrategy;
-use SocialDept\AtpResolver\Facades\Resolver;
+use SocialDept\AtpSupport\Facades\Resolver;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SplFileInfo;
 
@@ -29,7 +29,7 @@ class BlobManager
      */
     public function storageDriver(): BlobStorageDriver
     {
-        return config('parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
+        return config('atp-parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
     }
 
     /**
@@ -124,7 +124,7 @@ class BlobManager
     public function url(BlobReference|string $blob, string $did): string
     {
         $cid = $blob instanceof BlobReference ? $blob->getCid() : $blob;
-        $strategy = config('parity.blobs.url_strategy', BlobUrlStrategy::Cdn);
+        $strategy = config('atp-parity.blobs.url_strategy', BlobUrlStrategy::Cdn);
 
         // Try local first if configured
         if ($strategy === BlobUrlStrategy::Local) {
@@ -161,7 +161,7 @@ class BlobManager
      */
     public function cdnUrl(string $cid, string $did): string
     {
-        $cdnBase = config('parity.blobs.cdn_url', 'https://cdn.bsky.app');
+        $cdnBase = config('atp-parity.blobs.cdn_url', 'https://cdn.bsky.app');
 
         return "{$cdnBase}/img/feed_thumbnail/plain/{$did}/{$cid}@jpeg";
     }
@@ -171,7 +171,7 @@ class BlobManager
      */
     public function cdnUrlFull(string $cid, string $did): string
     {
-        $cdnBase = config('parity.blobs.cdn_url', 'https://cdn.bsky.app');
+        $cdnBase = config('atp-parity.blobs.cdn_url', 'https://cdn.bsky.app');
 
         return "{$cdnBase}/img/feed_fullsize/plain/{$did}/{$cid}@jpeg";
     }

@@ -42,7 +42,7 @@ class BlobUploader
         $blobRef = $client->atproto->repo->uploadBlob($file, $mimeType);
 
         // In MediaLibrary mode or when explicitly skipped, don't create local mapping
-        $driver = config('parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
+        $driver = config('atp-parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
         if ($skipLocalStorage || $driver === BlobStorageDriver::MediaLibrary) {
             return $blobRef;
         }

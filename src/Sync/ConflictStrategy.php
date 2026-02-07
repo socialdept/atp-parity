@@ -35,7 +35,7 @@ enum ConflictStrategy: string
      */
     public static function fromConfig(): self
     {
-        $strategy = config('parity.conflicts.strategy', 'remote');
+        $strategy = config('atp-parity.conflicts.strategy', 'remote');
 
         return self::tryFrom($strategy) ?? self::RemoteWins;
     }

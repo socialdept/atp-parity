@@ -1,23 +1,24 @@
 {
     "name": "socialdept/atp-parity",
     "description": "AT Protocol record mapping and sync for Laravel Eloquent models",
+    "type": "library",
     "license": "MIT",
-    "authors": [
-        {
-            "name": "Author Name",
-            "email": "author@email.com",
-            "homepage": "http://author.com"
-        }
-    ],
     "homepage": "https://github.com/socialdept/atp-parity",
-    "keywords": ["Laravel", "AT Protocol", "Bluesky", "ATP", "Parity", "Sync"],
+    "keywords": [
+        "Laravel",
+        "AT Protocol",
+        "Bluesky",
+        "ATP",
+        "Parity",
+        "Sync"
+    ],
     "require": {
         "php": "^8.2",
         "illuminate/support": "^11.0|^12.0",
         "illuminate/database": "^11.0|^12.0",
         "socialdept/atp-schema": "^0.3",
         "socialdept/atp-client": "^0.0",
-        "socialdept/atp-resolver": "^1.1",
+        "socialdept/atp-support": "^0.1",
         "socialdept/atp-signals": "^1.2"
     },
     "require-dev": {

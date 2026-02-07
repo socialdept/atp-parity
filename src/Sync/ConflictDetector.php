@@ -60,7 +60,7 @@ class ConflictDetector
      */
     protected function getCid(Model $model): ?string
     {
-        $column = config('parity.columns.cid', 'atp_cid');
+        $column = config('atp-parity.columns.cid', 'atp_cid');
 
         return $model->getAttribute($column);
     }

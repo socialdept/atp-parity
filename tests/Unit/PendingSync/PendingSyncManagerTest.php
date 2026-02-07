@@ -58,7 +58,7 @@ class PendingSyncManagerTest extends TestCase
 
     public function test_is_enabled_returns_true_when_configured(): void
     {
-        $this->app['config']->set('parity.pending_syncs.enabled', true);
+        $this->app['config']->set('atp-parity.pending_syncs.enabled', true);
 
         $this->assertTrue($this->manager->isEnabled());
     }
@@ -174,7 +174,7 @@ class PendingSyncManagerTest extends TestCase
         Event::fake([PendingSyncCaptured::class]);
 
         $model = TestModel::create(['content' => 'Test']);
-        $this->app['config']->set('parity.pending_syncs.max_attempts', 2);
+        $this->app['config']->set('atp-parity.pending_syncs.max_attempts', 2);
 
         $this->manager->capture('did:plc:test', $model, PendingSyncOperation::Sync);
 

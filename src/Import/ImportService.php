@@ -12,7 +12,7 @@ use SocialDept\AtpParity\Events\ImportFailed;
 use SocialDept\AtpParity\Events\ImportProgress;
 use SocialDept\AtpParity\Events\ImportStarted;
 use SocialDept\AtpParity\MapperRegistry;
-use SocialDept\AtpResolver\Facades\Resolver;
+use SocialDept\AtpSupport\Facades\Resolver;
 use Throwable;
 
 /**
@@ -87,14 +87,14 @@ class ImportService
 
         $client = $this->clientFor($pdsEndpoint);
         $cursor = $state->cursor;
-        $pageSize = config('parity.import.page_size', 100);
-        $pageDelay = config('parity.import.page_delay', 100);
+        $pageSize = config('atp-parity.import.page_size', 100);
+        $pageDelay = config('atp-parity.import.page_delay', 100);
         $recordClass = $mapper->recordClass();
 
         // Blob downloads during import only work in Filesystem mode
         // In MediaLibrary mode, models must handle blob downloads via syncAtpBlobsToMedia()
-        $storageDriver = config('parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
-        $downloadBlobs = config('parity.blobs.download_on_import', false)
+        $storageDriver = config('atp-parity.blobs.storage_driver', BlobStorageDriver::Filesystem);
+        $downloadBlobs = config('atp-parity.blobs.download_on_import', false)
             && $storageDriver === BlobStorageDriver::Filesystem;
         $blobManager = $downloadBlobs ? app(BlobManager::class) : null;
 

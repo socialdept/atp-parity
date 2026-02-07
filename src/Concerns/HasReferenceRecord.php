@@ -25,7 +25,7 @@ trait HasReferenceRecord
     public function getReferenceUriColumn(): string
     {
         return $this->referenceUriColumn
-            ?? config('parity.references.columns.reference_uri', 'atp_reference_uri');
+            ?? config('atp-parity.references.columns.reference_uri', 'atp_reference_uri');
     }
 
     /**
@@ -34,7 +34,7 @@ trait HasReferenceRecord
     public function getReferenceCidColumn(): string
     {
         return $this->referenceCidColumn
-            ?? config('parity.references.columns.reference_cid', 'atp_reference_cid');
+            ?? config('atp-parity.references.columns.reference_cid', 'atp_reference_cid');
     }
 
     /**
@@ -165,7 +165,7 @@ trait HasReferenceRecord
      */
     public function scopeFullySynced($query)
     {
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
 
         return $query->whereNotNull($uriColumn)
             ->whereNotNull($this->getReferenceUriColumn());

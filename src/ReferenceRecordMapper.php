@@ -60,12 +60,12 @@ abstract class ReferenceRecordMapper extends RecordMapper implements ReferenceMa
 
     public function referenceUriColumn(): string
     {
-        return config('parity.references.columns.reference_uri', $this->referenceUriColumn);
+        return config('atp-parity.references.columns.reference_uri', $this->referenceUriColumn);
     }
 
     public function referenceCidColumn(): string
     {
-        return config('parity.references.columns.reference_cid', $this->referenceCidColumn);
+        return config('atp-parity.references.columns.reference_cid', $this->referenceCidColumn);
     }
 
     public function mainMapper(): ?RecordMapperContract

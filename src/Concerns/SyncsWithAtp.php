@@ -38,8 +38,8 @@ trait SyncsWithAtp
      */
     public function markAsSynced(string $uri, string $cid): void
     {
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
-        $cidColumn = config('parity.columns.cid', 'atp_cid');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+        $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
         $syncColumn = $this->getAtpSyncedAtColumn();
 
         $this->setAttribute($uriColumn, $uri);

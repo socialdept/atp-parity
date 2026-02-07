@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $table = config('parity.blobs.table', 'parity_blob_mappings');
+        $table = config('atp-parity.blobs.table', 'parity_blob_mappings');
 
         Schema::create($table, function (Blueprint $table) {
             $table->id();
@@ -31,7 +31,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $table = config('parity.blobs.table', 'parity_blob_mappings');
+        $table = config('atp-parity.blobs.table', 'parity_blob_mappings');
 
         Schema::dropIfExists($table);
     }

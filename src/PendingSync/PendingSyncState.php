@@ -38,7 +38,7 @@ class PendingSyncState extends Model
 
     public function getTable(): string
     {
-        return config('parity.pending_syncs.table', 'parity_pending_syncs');
+        return config('atp-parity.pending_syncs.table', 'parity_pending_syncs');
     }
 
     /**
@@ -80,7 +80,7 @@ class PendingSyncState extends Model
      */
     public function scopeExpired(Builder $query): Builder
     {
-        $ttl = config('parity.pending_syncs.ttl', 3600);
+        $ttl = config('atp-parity.pending_syncs.ttl', 3600);
 
         return $query->where('created_at', '<', now()->subSeconds($ttl));
     }

@@ -14,7 +14,7 @@ use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Tests\Fixtures\TestMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestModel;
 use SocialDept\AtpParity\Tests\TestCase;
-use SocialDept\AtpResolver\Facades\Resolver;
+use SocialDept\AtpSupport\Facades\Resolver;
 
 class ImportServiceTest extends TestCase
 {

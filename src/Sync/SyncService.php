@@ -72,7 +72,7 @@ class SyncService
                 collection: $collection,
                 record: $record->toArray(),
                 rkey: method_exists($model, 'getDesiredAtpRkey') ? $model->getDesiredAtpRkey() : null,
-                validate: config('parity.sync.validate', true),
+                validate: config('atp-parity.sync.validate', true),
             );
 
             // Update model with ATP metadata
@@ -129,7 +129,7 @@ class SyncService
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
                 record: $record->toArray(),
-                validate: config('parity.sync.validate', true),
+                validate: config('atp-parity.sync.validate', true),
             );
 
             // Update model with new CID
@@ -224,7 +224,7 @@ class SyncService
      */
     protected function getModelUri(Model $model): ?string
     {
-        $column = config('parity.columns.uri', 'atp_uri');
+        $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $model->{$column};
     }
@@ -234,9 +234,9 @@ class SyncService
      */
     protected function updateModelMeta(Model $model, string $uri, string $cid): void
     {
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
-        $cidColumn = config('parity.columns.cid', 'atp_cid');
-        $syncedAtColumn = config('parity.columns.synced_at', 'atp_synced_at');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+        $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
+        $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
         $model->{$uriColumn} = $uri;
         $model->{$cidColumn} = $cid;
@@ -249,9 +249,9 @@ class SyncService
      */
     protected function clearModelMeta(Model $model): void
     {
-        $uriColumn = config('parity.columns.uri', 'atp_uri');
-        $cidColumn = config('parity.columns.cid', 'atp_cid');
-        $syncedAtColumn = config('parity.columns.synced_at', 'atp_synced_at');
+        $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
+        $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
+        $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
         $model->{$uriColumn} = null;
         $model->{$cidColumn} = null;
@@ -266,14 +266,16 @@ class SyncService
      */
     protected function parseUri(string $uri): ?array
     {
-        if (! preg_match('#^at://([^/]+)/([^/]+)/([^/]+)$#', $uri, $matches)) {
+        $parsed = \SocialDept\AtpSupport\AtUri::parse($uri);
+
+        if (! $parsed) {
             return null;
         }
 
         return [
-            'did' => $matches[1],
-            'collection' => $matches[2],
-            'rkey' => $matches[3],
+            'did' => $parsed->did,
+            'collection' => $parsed->collection,
+            'rkey' => $parsed->rkey,
         ];
     }
 

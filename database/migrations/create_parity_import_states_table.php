@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $table = config('parity.import.state_table', 'parity_import_states');
+        $table = config('atp-parity.import.state_table', 'parity_import_states');
 
         Schema::create($table, function (Blueprint $table) {
             $table->id();
@@ -31,7 +31,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $table = config('parity.import.state_table', 'parity_import_states');
+        $table = config('atp-parity.import.state_table', 'parity_import_states');
 
         Schema::dropIfExists($table);
     }
