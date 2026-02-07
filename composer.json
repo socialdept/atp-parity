@@ -16,7 +16,7 @@
         "php": "^8.2",
         "illuminate/support": "^11.0|^12.0",
         "illuminate/database": "^11.0|^12.0",
-        "socialdept/atp-schema": "^0.3",
+        "socialdept/atp-schema": "^0.4",
         "socialdept/atp-client": "^0.1",
         "socialdept/atp-support": "^0.1",
         "socialdept/atp-signals": "^2.0"
