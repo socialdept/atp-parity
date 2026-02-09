@@ -18,7 +18,7 @@
         "illuminate/database": "^11.0|^12.0",
         "socialdept/atp-schema": "^0.4",
         "socialdept/atp-client": "^0.1",
-        "socialdept/atp-support": "^0.1 || ^0.2",
+        "socialdept/atp-support": "^0.3",
         "socialdept/atp-signals": "^2.0"
     },
     "require-dev": {
