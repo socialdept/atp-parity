@@ -3,11 +3,13 @@
 namespace SocialDept\AtpParity\Sync;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use SocialDept\AtpClient\Exceptions\AuthenticationException;
 use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
 use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
+use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\MapperRegistry;
 use Throwable;
@@ -68,12 +70,12 @@ class ReferenceSyncService
         }
 
         if ($referenceResult->isFailed()) {
-            // Return partial success - main synced but reference failed
-            return ReferenceSyncResult::success(
+            // Main synced but reference failed: surface it instead of hiding it.
+            return ReferenceSyncResult::referenceFailed(
                 mainUri: $mainResult->uri,
                 mainCid: $mainResult->cid,
                 referenceUri: null,
-                referenceCid: null
+                referenceError: $referenceResult->error ?? 'Reference record sync failed.',
             );
         }
 
@@ -134,6 +136,8 @@ class ReferenceSyncService
                 throw $e;
             }
 
+            $this->reportReferenceFailure($model, null, $e);
+
             return SyncResult::failed($e->getMessage());
         }
     }
@@ -187,12 +191,13 @@ class ReferenceSyncService
         $referenceResult = $this->resyncReference($model, $referenceMapper);
 
         if ($referenceResult->isFailed()) {
-            // Main succeeded but reference failed - return partial success
-            return ReferenceSyncResult::success(
+            // Main succeeded but reference failed: keep the (stale) reference uri
+            // and surface the failure instead of reporting it as a clean success.
+            return ReferenceSyncResult::referenceFailed(
                 mainUri: $mainResult->uri,
                 mainCid: $mainResult->cid,
                 referenceUri: $model->{$referenceMapper->referenceUriColumn()},
-                referenceCid: $oldReferenceCid
+                referenceError: $referenceResult->error ?? 'Reference record sync failed.',
             );
         }
 
@@ -242,8 +247,25 @@ class ReferenceSyncService
                 throw $e;
             }
 
+            $this->reportReferenceFailure($model, $uri, $e);
+
             return SyncResult::failed($e->getMessage());
         }
+    }
+
+    /**
+     * Log and broadcast a reference-record write failure so it is never silent.
+     */
+    protected function reportReferenceFailure(Model $model, ?string $referenceUri, Throwable $e): void
+    {
+        Log::warning('atp-parity: reference record sync failed', [
+            'model' => $model::class,
+            'model_id' => $model->getKey(),
+            'reference_uri' => $referenceUri,
+            'error' => $e->getMessage(),
+        ]);
+
+        event(new ReferenceSyncFailed($model, $e->getMessage(), $referenceUri));
     }
 
     /**
