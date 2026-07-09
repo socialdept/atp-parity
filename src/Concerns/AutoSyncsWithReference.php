@@ -37,7 +37,16 @@ trait AutoSyncsWithReference
 
                 if ($did && $mapper) {
                     try {
-                        app(ReferenceSyncService::class)->syncWithReference($did, $model, $mapper);
+                        $result = app(ReferenceSyncService::class)->syncWithReference($did, $model, $mapper);
+
+                        if ($result->hasReferenceFailure()) {
+                            static::capturePendingSyncWithReference(
+                                $model,
+                                $did,
+                                PendingSyncOperation::SyncWithReference,
+                                $mapper
+                            );
+                        }
                     } catch (OAuthSessionInvalidException|AuthenticationException $e) {
                         static::capturePendingSyncWithReference(
                             $model,
@@ -59,7 +68,20 @@ trait AutoSyncsWithReference
                 if ($mapper) {
                     try {
                         // Resync BOTH main and reference records
-                        app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
+                        $result = app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
+
+                        if ($result->hasReferenceFailure()) {
+                            $did = $model->getAtpDid() ?? $model->syncAsDid();
+
+                            if ($did) {
+                                static::capturePendingSyncWithReference(
+                                    $model,
+                                    $did,
+                                    PendingSyncOperation::ResyncWithReference,
+                                    $mapper
+                                );
+                            }
+                        }
                     } catch (OAuthSessionInvalidException|AuthenticationException $e) {
                         $did = $model->getAtpDid() ?? $model->syncAsDid();
 

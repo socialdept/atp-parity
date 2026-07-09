@@ -93,4 +93,36 @@ class ReferenceSyncResultTest extends TestCase
         $this->assertTrue($result->hasReferenceOnly());
         $this->assertFalse($result->hasMainOnly());
     }
+
+    public function test_reference_failed_surfaces_the_failure_without_reporting_success(): void
+    {
+        $result = ReferenceSyncResult::referenceFailed(
+            mainUri: 'at://did:plc:test/app.test.main/abc',
+            mainCid: 'bafyrei123',
+            referenceUri: 'at://did:plc:test/app.test.ref/stale',
+            referenceError: 'PDS unavailable',
+        );
+
+        // Main synced, so success stays true for existing callers...
+        $this->assertTrue($result->isSuccess());
+        // ...but the reference failure is now inspectable.
+        $this->assertTrue($result->hasReferenceFailure());
+        $this->assertSame('PDS unavailable', $result->referenceError);
+        // A stale reference must not read as fully synced.
+        $this->assertFalse($result->isFullySynced());
+        $this->assertTrue($result->hasMainOnly());
+    }
+
+    public function test_clean_success_has_no_reference_failure(): void
+    {
+        $result = ReferenceSyncResult::success(
+            mainUri: 'at://did:plc:test/app.test.main/abc',
+            mainCid: 'bafyrei123',
+            referenceUri: 'at://did:plc:test/app.test.ref/xyz',
+            referenceCid: 'bafyrei456'
+        );
+
+        $this->assertFalse($result->hasReferenceFailure());
+        $this->assertNull($result->referenceError);
+    }
 }
