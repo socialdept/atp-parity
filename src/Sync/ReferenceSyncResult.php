@@ -16,6 +16,7 @@ readonly class ReferenceSyncResult
         public ?string $referenceUri = null,
         public ?string $referenceCid = null,
         public ?string $error = null,
+        public ?string $referenceError = null,
     ) {}
 
     /**
@@ -39,7 +40,7 @@ readonly class ReferenceSyncResult
      */
     public function isFullySynced(): bool
     {
-        return $this->success && $this->mainUri && $this->referenceUri;
+        return $this->success && $this->mainUri && $this->referenceUri && ! $this->hasReferenceFailure();
     }
 
     /**
@@ -47,7 +48,15 @@ readonly class ReferenceSyncResult
      */
     public function hasMainOnly(): bool
     {
-        return $this->success && $this->mainUri && ! $this->referenceUri;
+        return $this->success && $this->mainUri && (! $this->referenceUri || $this->hasReferenceFailure());
+    }
+
+    /**
+     * Check if the main record synced but the reference leg failed.
+     */
+    public function hasReferenceFailure(): bool
+    {
+        return $this->referenceError !== null;
     }
 
     /**
@@ -91,6 +100,27 @@ readonly class ReferenceSyncResult
             mainCid: $mainCid,
             referenceUri: $referenceUri,
             referenceCid: $referenceCid,
+        );
+    }
+
+    /**
+     * Create a partial result: the main record synced but the reference failed.
+     *
+     * Kept as success (the main leg did sync) so existing callers are unaffected,
+     * but hasReferenceFailure() and referenceError expose the stale reference.
+     */
+    public static function referenceFailed(
+        ?string $mainUri,
+        ?string $mainCid,
+        ?string $referenceUri,
+        string $referenceError,
+    ): self {
+        return new self(
+            success: true,
+            mainUri: $mainUri,
+            mainCid: $mainCid,
+            referenceUri: $referenceUri,
+            referenceError: $referenceError,
         );
     }
 

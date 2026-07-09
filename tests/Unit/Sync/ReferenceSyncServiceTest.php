@@ -5,6 +5,7 @@ namespace SocialDept\AtpParity\Tests\Unit\Sync;
 use Illuminate\Support\Facades\Event;
 use Mockery;
 use SocialDept\AtpParity\Events\RecordSynced;
+use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
@@ -154,6 +155,67 @@ class ReferenceSyncServiceTest extends TestCase
         $this->assertTrue($result->hasMainOnly());
         $this->assertSame('at://did:plc:test/app.test.main/abc', $result->mainUri);
         $this->assertNull($result->referenceUri);
+    }
+
+    public function test_sync_with_reference_surfaces_reference_failure_when_rollback_disabled(): void
+    {
+        $model = ReferenceModel::create(['title' => 'Test']);
+
+        $this->mockAtpClientForMainThenReferenceFailure(
+            'did:plc:test',
+            mainUri: 'at://did:plc:test/app.test.main/abc',
+            mainCid: 'bafyreiMain',
+            refError: 'Reference creation failed'
+        );
+
+        $result = $this->service->syncWithReference(
+            'did:plc:test',
+            $model,
+            $this->referenceMapper,
+            rollbackOnFailure: false
+        );
+
+        // The reference failure is no longer hidden behind a clean success.
+        $this->assertTrue($result->hasReferenceFailure());
+        $this->assertStringContainsString('Reference creation failed', $result->referenceError);
+        Event::assertDispatched(ReferenceSyncFailed::class);
+    }
+
+    public function test_resync_with_reference_surfaces_reference_failure_and_keeps_stale_reference(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Updated',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMainOld',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+            'atp_reference_cid' => 'bafyreiRefOld',
+        ]);
+
+        $this->mockAtpClientForReferenceUpdateFailure(
+            'did:plc:test',
+            mainUri: 'at://did:plc:test/app.test.main/abc',
+            mainCid: 'bafyreiMainNew',
+            refError: 'PDS unavailable'
+        );
+
+        $result = $this->service->resyncWithReference($model, $this->referenceMapper);
+
+        // Main synced; the reference is surfaced as failed, not a fake success.
+        $this->assertTrue($result->isSuccess());
+        $this->assertTrue($result->hasReferenceFailure());
+        $this->assertStringContainsString('PDS unavailable', $result->referenceError);
+        $this->assertFalse($result->isFullySynced());
+
+        // The stale reference is retained and its CID is not overwritten.
+        $this->assertSame('at://did:plc:test/app.test.ref/existing', $result->referenceUri);
+        $model->refresh();
+        $this->assertSame('bafyreiRefOld', $model->atp_reference_cid);
+
+        Event::assertDispatched(ReferenceSyncFailed::class, function ($event) use ($model) {
+            return $event->model->is($model)
+                && $event->referenceUri === 'at://did:plc:test/app.test.ref/existing';
+        });
+        Event::assertNotDispatched(ReferenceSynced::class);
     }
 
     public function test_sync_with_reference_dispatches_events(): void
@@ -597,6 +659,38 @@ class ReferenceSyncServiceTest extends TestCase
             ->andThrow(new \Exception($refError));
         $repoClient->shouldReceive('deleteRecord')
             ->andReturnNull();
+
+        $atprotoClient = Mockery::mock();
+        $atprotoClient->repo = $repoClient;
+
+        $atpClient = Mockery::mock();
+        $atpClient->atproto = $atprotoClient;
+
+        $manager = Mockery::mock();
+        $manager->shouldReceive('as')
+            ->with($did)
+            ->andReturn($atpClient);
+
+        $this->app->instance('atp-client', $manager);
+    }
+
+    protected function mockAtpClientForReferenceUpdateFailure(
+        string $did,
+        string $mainUri,
+        string $mainCid,
+        string $refError
+    ): void {
+        $mainResponse = new \stdClass();
+        $mainResponse->uri = $mainUri;
+        $mainResponse->cid = $mainCid;
+
+        $repoClient = Mockery::mock();
+        $repoClient->shouldReceive('putRecord')
+            ->once()
+            ->andReturn($mainResponse);
+        $repoClient->shouldReceive('putRecord')
+            ->once()
+            ->andThrow(new \Exception($refError));
 
         $atprotoClient = Mockery::mock();
         $atprotoClient->repo = $repoClient;

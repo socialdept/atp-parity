@@ -243,7 +243,10 @@ class PendingSyncManager
 
         $result = $this->referenceSyncService->syncWithReference($pendingSync->did, $model, $mapper);
 
-        return ['success' => $result->isSuccess(), 'error' => $result->error];
+        return [
+            'success' => $result->isSuccess() && ! $result->hasReferenceFailure(),
+            'error' => $result->referenceError ?? $result->error,
+        ];
     }
 
     /**
@@ -259,7 +262,10 @@ class PendingSyncManager
 
         $result = $this->referenceSyncService->resyncWithReference($model, $mapper);
 
-        return ['success' => $result->isSuccess(), 'error' => $result->error];
+        return [
+            'success' => $result->isSuccess() && ! $result->hasReferenceFailure(),
+            'error' => $result->referenceError ?? $result->error,
+        ];
     }
 
     /**
