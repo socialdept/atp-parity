@@ -152,6 +152,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Backfill
+    |--------------------------------------------------------------------------
+    |
+    | How historical (replayed) events are treated. A backfilled event carries a
+    | record's *old* CID, so the "CID unchanged" check never matches and every
+    | past version would otherwise be re-applied in order — over whatever newer
+    | state you hold locally.
+    |
+    */
+    'backfill' => [
+        // Allow a replayed historical event to overwrite a record that already
+        // exists locally. Leave false unless the network is your only author.
+        'overwrites_existing' => env('PARITY_BACKFILL_OVERWRITES_EXISTING', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Pending Syncs
     |--------------------------------------------------------------------------
     |

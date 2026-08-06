@@ -2,6 +2,23 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v0.5.0
+
+### Added
+- **Backfill gating.** A replayed historical event no longer overwrites a record
+  that already exists locally. The "CID unchanged" check cannot catch this: a
+  replay carries the record's *old* CID, which never matches the latest one
+  stored, so every past version was re-applied in turn — and under the default
+  `remote` conflict strategy, applied over newer local edits. Configure with
+  `atp-parity.backfill.overwrites_existing` (`PARITY_BACKFILL_OVERWRITES_EXISTING`),
+  default `false`.
+- `$meta['backfill']` is now passed to mappers, so an app can tell a replayed
+  historical event from a live commit.
+
+### Changed
+- **Requires `socialdept/atp-signals ^2.1`** (was `^2.0`). `SignalEvent::$backfill`
+  was introduced in 2.1.0; on 2.0.x it does not exist and the gate cannot work.
+
 ## v0.4.10
 
 ### Added

@@ -263,6 +263,9 @@ class ParitySignal extends Signal
             'cid' => $commit->cid,
             'did' => $event->did,
             'rkey' => $commit->rkey,
+            // Historical replay rather than a live commit. Mappers need this to
+            // tell "we are catching up" from "something just changed".
+            'backfill' => $event->backfill,
         ];
 
         // Check for existing model and potential conflict
@@ -280,6 +283,26 @@ class ParitySignal extends Signal
 
                 return;
             }
+        }
+
+        // A backfilled event for a record we already hold is us re-reading
+        // history, not news, and it must not be allowed to overwrite local
+        // state. The CID check above cannot catch this: a replay carries the
+        // record's *old* CID, which never matches the latest one we stored, so
+        // every historical version would otherwise be re-applied in turn — and
+        // under the `remote` conflict strategy, applied over newer local edits.
+        //
+        // There is no reliable way to detect staleness after the fact instead.
+        // `rev` is monotonic per repo but an archive stamps a whole backfill
+        // with a single rev, and a record's own `updatedAt` is usually optional
+        // in its lexicon. So the ordering signal has to be the event's, and the
+        // safe reading of "historical" is "do not overwrite".
+        if ($existing && $event->backfill && ! $this->backfillOverwritesExisting()) {
+            $this->debug('Skipping upsert: backfilled event for a record we already hold', $event, [
+                'uri' => $uri,
+            ]);
+
+            return;
         }
 
         // Capture existing blob CIDs before any changes
@@ -405,6 +428,18 @@ class ParitySignal extends Signal
         ]);
 
         return false;
+    }
+
+    /**
+     * Whether a backfilled event may overwrite a record we already hold.
+     *
+     * Off by default. An app that treats the network as the source of truth and
+     * wants a full replay to win can opt in, but for anything that also authors
+     * locally this is how newer local state gets silently reverted.
+     */
+    protected function backfillOverwritesExisting(): bool
+    {
+        return (bool) config('atp-parity.backfill.overwrites_existing', false);
     }
 
     /**
