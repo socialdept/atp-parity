@@ -119,4 +119,35 @@ class ParitySignalBackfillTest extends TestCase
 
         $this->assertSame('replayed history wins', TestModel::first()->content);
     }
+
+    public function test_a_construction_failure_is_observable_not_just_logged(): void
+    {
+        // Without a validation mode the exception is re-thrown rather than
+        // swallowed, which is a different (and louder) path than the silent drop
+        // this event exists to make visible.
+        config()->set('atp-parity.validation.mode', \SocialDept\AtpParity\Enums\ValidationMode::Optimistic);
+
+        \Illuminate\Support\Facades\Event::fake([\SocialDept\AtpParity\Events\RecordConstructionFailed::class]);
+
+        // `text` is typed `string`, so an array for it is a TypeError the DTO
+        // cannot recover from — the shape that silently discarded 994 records in
+        // production while every health signal kept reporting normal.
+        $event = new SignalEvent(
+            did: 'did:plc:test',
+            timeUs: 1,
+            kind: 'commit',
+            commit: new CommitEvent(
+                rev: 'r', operation: 'create', collection: 'app.test.record',
+                rkey: 'broken', record: (object) ['text' => ['not', 'a', 'string']], cid: 'bafyreibroken',
+            ),
+            backfill: false,
+        );
+
+        $this->signal->handle($event);
+
+        \Illuminate\Support\Facades\Event::assertDispatched(
+            \SocialDept\AtpParity\Events\RecordConstructionFailed::class,
+            fn ($e) => $e->collection === 'app.test.record' && $e->rkey === 'broken',
+        );
+    }
 }

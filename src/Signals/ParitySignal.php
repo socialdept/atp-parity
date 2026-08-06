@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\Contracts\ResolvesConflictStrategy;
+use SocialDept\AtpParity\Events\ConflictResolved;
+use SocialDept\AtpParity\Events\RecordConstructionFailed;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ConflictDetector;
 use SocialDept\AtpParity\Sync\ConflictResolver;
@@ -246,6 +248,15 @@ class ParitySignal extends Signal
                 ]);
             }
 
+            // Observable, not just logged: this path drops the record entirely
+            // while the cursor still advances, so nothing downstream can tell.
+            event(new RecordConstructionFailed(
+                did: $event->did,
+                collection: $commit->collection,
+                rkey: $commit->rkey,
+                error: $e->getMessage(),
+            ));
+
             $this->debug('Skipping upsert: record failed to construct', $event, [
                 'error' => $e->getMessage(),
             ]);
@@ -329,6 +340,13 @@ class ParitySignal extends Signal
 
                 return;
             }
+
+            event(new ConflictResolved(
+                model: $existing,
+                strategy: $strategy,
+                winner: $resolution->winner,
+                uri: $uri,
+            ));
 
             $this->debug('Conflict resolved', $event, ['resolution' => $resolution->winner]);
 

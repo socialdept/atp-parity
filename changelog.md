@@ -25,6 +25,15 @@ All notable changes to `atp-parity` will be documented in this file.
   which side should win is often a property of the individual record. Mappers that
   do not implement it keep using `atp-parity.conflicts.strategy`.
 
+- **`ConflictResolved`** — dispatched whenever a conflict is resolved, under
+  every strategy. `ConflictDetected` only fires for `manual`, so the strategies
+  that silently discard one side left no trace at all, and an application cannot
+  notice a wrong policy it is never told about.
+- **`RecordConstructionFailed`** — dispatched when an inbound record cannot be
+  built into its DTO and is dropped. Previously log-only: the record never
+  reaches a mapper, the cursor still advances, and a malformed lexicon field can
+  discard an entire collection while every other health signal reads normal.
+
 ### Changed
 - **Requires `socialdept/atp-signals ^2.1`** (was `^2.0`). `SignalEvent::$backfill`
   was introduced in 2.1.0; on 2.0.x it does not exist and the gate cannot work.
