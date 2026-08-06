@@ -50,6 +50,7 @@ abstract class TestCase extends Orchestra
             $table->string('did')->nullable();
             $table->string('atp_uri')->nullable()->unique();
             $table->string('atp_cid')->nullable();
+            $table->string('atp_rkey')->nullable();
             $table->timestamp('atp_synced_at')->nullable();
             $table->timestamps();
         });

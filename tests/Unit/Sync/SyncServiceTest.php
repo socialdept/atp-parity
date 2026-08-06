@@ -133,6 +133,33 @@ class SyncServiceTest extends TestCase
         $this->assertSame('updatedcid', $result->cid);
     }
 
+    public function test_resync_targets_the_rkey_inside_the_uri_not_a_stored_one(): void
+    {
+        // A model imported from someone else's repo carries the real rkey in
+        // atp_uri, while an app that assigns rkeys locally may hold a different
+        // value in its own column. Deriving the target from anything but the URI
+        // would write a second record and orphan the one we imported.
+        $model = TestModel::create([
+            'content' => 'Imported',
+            'atp_uri' => 'at://did:plc:test/app.test.record/theirkey',
+            'atp_rkey' => 'our-locally-assigned-tid',
+        ]);
+
+        $captured = null;
+        $this->mockAtpClientForUpdate(
+            'did:plc:test',
+            'at://did:plc:test/app.test.record/theirkey',
+            'newcid',
+            function (array $args) use (&$captured) {
+                $captured = $args;
+            },
+        );
+
+        $this->service->resync($model);
+
+        $this->assertSame('theirkey', $captured['rkey']);
+    }
+
     public function test_unsync_removes_record_and_clears_metadata(): void
     {
         $model = TestModel::create([
@@ -256,7 +283,7 @@ class SyncServiceTest extends TestCase
     /**
      * Mock AtpClient for update operations.
      */
-    protected function mockAtpClientForUpdate(string $did, string $returnUri, string $returnCid): void
+    protected function mockAtpClientForUpdate(string $did, string $returnUri, string $returnCid, ?callable $capture = null): void
     {
         $response = new \stdClass();
         $response->uri = $returnUri;
@@ -264,7 +291,17 @@ class SyncServiceTest extends TestCase
 
         $repoClient = Mockery::mock();
         $repoClient->shouldReceive('putRecord')
-            ->andReturn($response);
+            ->andReturnUsing(function (...$args) use ($response, $capture) {
+                if ($capture) {
+                    // Called with named arguments, so the keys are the names.
+                    $capture([
+                        'collection' => $args['collection'] ?? $args[0] ?? null,
+                        'rkey' => $args['rkey'] ?? $args[1] ?? null,
+                    ]);
+                }
+
+                return $response;
+            });
 
         // Create client mock with property chain (no typed properties)
         $atprotoClient = Mockery::mock();

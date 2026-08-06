@@ -57,6 +57,44 @@ class RecordMapperTest extends TestCase
         $this->assertSame('bafyreiabc', $model->atp_cid);
     }
 
+    public function test_meta_does_not_store_the_rkey_by_default(): void
+    {
+        $model = $this->mapper->toModel(new TestRecord(text: 'Test'), ['rkey' => 'abc123']);
+
+        // Opt-in: most models have nowhere to put it, and filling a column that
+        // does not exist fails the insert.
+        $this->assertNull($model->atp_rkey);
+    }
+
+    public function test_meta_stores_the_rkey_when_a_column_is_configured(): void
+    {
+        config()->set('atp-parity.columns.rkey', 'atp_rkey');
+
+        $model = $this->mapper->toModel(new TestRecord(text: 'Test'), ['rkey' => 'abc123']);
+
+        $this->assertSame('abc123', $model->atp_rkey);
+    }
+
+    public function test_an_existing_locally_assigned_rkey_is_replaced_by_the_real_one(): void
+    {
+        config()->set('atp-parity.columns.rkey', 'atp_rkey');
+
+        $model = TestModel::create([
+            'content' => 'old',
+            'atp_uri' => 'at://did:plc:test/app.test.record/abc123',
+            'atp_rkey' => 'locally-generated-tid',
+        ]);
+
+        // An app that assigns the rkey at creation holds a value the repo never
+        // had. Import is the moment the real one becomes known.
+        $this->mapper->updateModel($model, new TestRecord(text: 'new'), [
+            'uri' => 'at://did:plc:test/app.test.record/abc123',
+            'rkey' => 'abc123',
+        ]);
+
+        $this->assertSame('abc123', $model->atp_rkey);
+    }
+
     public function test_to_record_converts_model_to_record(): void
     {
         $model = new TestModel(['content' => 'Test content']);

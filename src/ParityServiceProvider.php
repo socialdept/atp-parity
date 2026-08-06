@@ -317,6 +317,11 @@ class ParityServiceProvider extends ServiceProvider
         $this->publishesMigrations([
             $path.'/create_parity_pending_syncs_table.php' => $dest.'/0000_00_00_000004_create_parity_pending_syncs_table.php',
         ], 'parity-migrations-pending-syncs');
+
+        // Optional: Parking orphaned reference records (deferred_references.enabled)
+        $this->publishesMigrations([
+            $path.'/create_parity_deferred_references_table.php' => $dest.'/0000_00_00_000005_create_parity_deferred_references_table.php',
+        ], 'parity-migrations-deferred-references');
     }
 
     public function provides(): array

@@ -32,6 +32,12 @@ return [
         'uri' => 'atp_uri',
         'cid' => 'atp_cid',
         'synced_at' => 'atp_synced_at',
+
+        // Optional. When set, imports stamp the record's real rkey here. An app
+        // that assigns an rkey locally before the record exists remotely will
+        // otherwise hold a value that disagrees with the repo, which matters the
+        // moment anything routes or reconciles by rkey. Null = do not track.
+        'rkey' => null,
     ],
 
     /*

@@ -85,6 +85,18 @@ abstract class RecordMapper implements RecordMapperContract
         return config('atp-parity.columns.synced_at', 'atp_synced_at');
     }
 
+    /**
+     * Get the column name for storing the record's rkey, or null to skip it.
+     *
+     * Opt-in: only apps that read the rkey back — for routing, reconciliation,
+     * or building canonical paths — need it stored, and an app that assigns the
+     * rkey itself on create must have imports overwrite it with the real one.
+     */
+    protected function rkeyColumn(): ?string
+    {
+        return config('atp-parity.columns.rkey');
+    }
+
     public function toModel(Data $record, array $meta = []): Model
     {
         $modelClass = $this->modelClass();
@@ -254,6 +266,10 @@ abstract class RecordMapper implements RecordMapperContract
 
         if (isset($meta['cid'])) {
             $attributes[$this->cidColumn()] = $meta['cid'];
+        }
+
+        if (isset($meta['rkey']) && ($rkeyColumn = $this->rkeyColumn())) {
+            $attributes[$rkeyColumn] = $meta['rkey'];
         }
 
         // Always set synced_at when applying meta
