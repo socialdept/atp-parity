@@ -20,6 +20,11 @@ All notable changes to `atp-parity` will be documented in this file.
   (revisions, snapshots, translations) had nowhere to put it and was silently
   dropped by `fill()`. No-op by default.
 
+- **`Contracts\ResolvesConflictStrategy`** — an opt-in interface letting a mapper
+  choose the conflict strategy per record. The configured strategy is global, but
+  which side should win is often a property of the individual record. Mappers that
+  do not implement it keep using `atp-parity.conflicts.strategy`.
+
 ### Changed
 - **Requires `socialdept/atp-signals ^2.1`** (was `^2.0`). `SignalEvent::$backfill`
   was introduced in 2.1.0; on 2.0.x it does not exist and the gate cannot work.

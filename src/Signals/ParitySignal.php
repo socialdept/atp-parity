@@ -5,6 +5,7 @@ namespace SocialDept\AtpParity\Signals;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
+use SocialDept\AtpParity\Contracts\ResolvesConflictStrategy;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ConflictDetector;
 use SocialDept\AtpParity\Sync\ConflictResolver;
@@ -309,7 +310,11 @@ class ParitySignal extends Signal
         $existingBlobs = $existing?->getAttribute('atp_blobs');
 
         if ($existing && $this->conflictDetector->hasConflict($existing, $record, $commit->cid)) {
-            $strategy = ConflictStrategy::fromConfig();
+            // A mapper may decide per record — authority often belongs to the
+            // record's provenance rather than to a global setting.
+            $strategy = ($mapper instanceof ResolvesConflictStrategy
+                ? $mapper->conflictStrategy($existing)
+                : null) ?? ConflictStrategy::fromConfig();
             $resolution = $this->conflictResolver->resolve(
                 $existing,
                 $record,
