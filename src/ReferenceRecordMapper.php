@@ -7,6 +7,11 @@ use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use SocialDept\AtpParity\Enums\ReferenceFormat;
+use DateTimeImmutable;
+use Illuminate\Support\Facades\Log;
+use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
+use SocialDept\AtpParity\Data\DeferredReference;
+use SocialDept\AtpParity\Events\DeferredReferenceParked;
 use SocialDept\AtpSchema\Data\Data;
 
 /**
@@ -174,6 +179,100 @@ abstract class ReferenceRecordMapper extends RecordMapper implements ReferenceMa
         }
 
         return $attributes;
+    }
+
+    /**
+     * Apply an inbound reference record to the model it points at.
+     *
+     * A reference record never creates anything. It carries no content of its
+     * own — only a strong-ref at a main record — so its job is to annotate that
+     * model with its URI and CID, which is how the model declares itself part of
+     * this application.
+     *
+     * The base implementation cannot do this: it resolves by the inbound
+     * record's own URI (which `atp_uri` never holds — that column stores what
+     * the reference points *at*), so the lookup always misses, and `applyMeta()`
+     * then writes the reference's URI over `atp_uri` on a blank row. This
+     * override is why `ReferenceRecordMapper` exists on the inbound path at all.
+     *
+     * Returns null when the target has not arrived yet. Ordering is not
+     * guaranteed — a producer may write the reference first — so callers should
+     * treat null-with-a-target as "defer", not "reject"; see
+     * {@see referenceTargetMissing()}.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function upsert(Data $record, array $meta = []): ?Model
+    {
+        $ref = $this->extractReference($record);
+
+        if (! $ref) {
+            return null;
+        }
+
+        // By the main URI first; fall back to the reference column for a model
+        // we have already linked, so re-delivery is idempotent.
+        $existing = $this->findByUri($ref->uri)
+            ?? (isset($meta['uri']) ? $this->findByReferenceUri($meta['uri']) : null);
+
+        if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
+            return null;
+        }
+
+        if (! $existing) {
+            $this->referenceTargetMissing($record, $meta, $ref->uri);
+
+            return null;
+        }
+
+        if (isset($meta['uri'])) {
+            $existing->setAttribute($this->referenceUriColumn(), $meta['uri']);
+        }
+
+        if (isset($meta['cid'])) {
+            $existing->setAttribute($this->referenceCidColumn(), $meta['cid']);
+        }
+
+        $existing->save();
+
+        return $existing;
+    }
+
+    /**
+     * Hook for a reference whose target is not here yet.
+     *
+     * Refusing would be data loss: the delivering consumer has already acked, so
+     * the reference is simply dropped and only a manual cursor rewind recovers
+     * it. Override to park it and replay when the target lands.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function referenceTargetMissing(Data $record, array $meta, string $targetUri): void
+    {
+        if (! config('atp-parity.deferred_references.enabled', true)) {
+            return;
+        }
+
+        try {
+            app(DeferredReferenceStore::class)->park(new DeferredReference(
+                referenceUri: $meta['uri'] ?? '',
+                targetUri: $targetUri,
+                    collection: $this->lexicon(),
+                    did: $meta['did'] ?? '',
+                    cid: $meta['cid'] ?? null,
+                    record: $record->toArray(),
+                parkedAt: new DateTimeImmutable(),
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('[Parity] Could not park deferred reference', [
+                'reference_uri' => $meta['uri'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        event(new DeferredReferenceParked($meta['uri'] ?? '', $targetUri, $this->lexicon()));
     }
 
     /**

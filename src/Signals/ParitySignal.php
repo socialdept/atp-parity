@@ -412,7 +412,7 @@ class ParitySignal extends Signal
      */
     protected function debug(string $message, ?SignalEvent $event, array $extra = []): void
     {
-        if (! config('signal.debug', false)) {
+        if (! config('atp-signals.debug', false)) {
             return;
         }
 

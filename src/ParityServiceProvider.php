@@ -14,11 +14,13 @@ use SocialDept\AtpParity\Commands\ImportCommand;
 use SocialDept\AtpParity\Commands\ImportStatusCommand;
 use SocialDept\AtpParity\Commands\MakeMapperCommand;
 use SocialDept\AtpParity\Contracts\BlobStorage;
+use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\PendingSyncStore;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
 use SocialDept\AtpParity\Listeners\RetryPendingSyncsOnAuth;
+use SocialDept\AtpParity\DeferredReference\DatabaseDeferredReferenceStore;
 use SocialDept\AtpParity\PendingSync\CachePendingSyncStore;
 use SocialDept\AtpParity\PendingSync\DatabasePendingSyncStore;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
@@ -195,6 +197,8 @@ class ParityServiceProvider extends ServiceProvider
      */
     protected function registerPendingSyncServices(): void
     {
+        $this->app->singleton(DeferredReferenceStore::class, fn () => new DatabaseDeferredReferenceStore());
+
         $this->app->singleton(PendingSyncStore::class, function ($app) {
             $storage = config('atp-parity.pending_syncs.storage', 'cache');
 
@@ -277,6 +281,7 @@ class ParityServiceProvider extends ServiceProvider
         ], 'parity-stubs');
 
         $this->commands([
+            Commands\PruneDeferredReferencesCommand::class,
             DiscoverCommand::class,
             ExportCommand::class,
             ImportCommand::class,

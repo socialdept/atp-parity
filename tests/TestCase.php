@@ -123,5 +123,17 @@ abstract class TestCase extends Orchestra
             $table->index(['model_class', 'model_id']);
             $table->index('created_at');
         });
+
+        Schema::create('parity_deferred_references', function (Blueprint $table) {
+            $table->id();
+            $table->string('reference_uri')->unique();
+            $table->string('target_uri')->index();
+            $table->string('collection');
+            $table->string('did')->index();
+            $table->string('cid')->nullable();
+            $table->json('record');
+            $table->timestamp('parked_at')->index();
+            $table->timestamps();
+        });
     }
 }
