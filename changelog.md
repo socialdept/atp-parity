@@ -14,6 +14,11 @@ All notable changes to `atp-parity` will be documented in this file.
   default `false`.
 - `$meta['backfill']` is now passed to mappers, so an app can tell a replayed
   historical event from a live commit.
+- **`RecordMapper::afterUpsert($model, $record, $meta, $created)`** — a hook that
+  runs once the model is persisted. `recordToAttributes()` can only describe
+  columns on the row itself, so a record whose content belongs in related tables
+  (revisions, snapshots, translations) had nowhere to put it and was silently
+  dropped by `fill()`. No-op by default.
 
 ### Changed
 - **Requires `socialdept/atp-signals ^2.1`** (was `^2.0`). `SignalEvent::$backfill`

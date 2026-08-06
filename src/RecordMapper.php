@@ -169,6 +169,7 @@ abstract class RecordMapper implements RecordMapperContract
             if ($existing) {
                 $this->updateModel($existing, $record, $meta);
                 $existing->save();
+                $this->afterUpsert($existing, $record, $meta, created: false);
 
                 return $existing;
             }
@@ -182,7 +183,27 @@ abstract class RecordMapper implements RecordMapperContract
         // Updates skip this entirely.
         $this->replayDeferredReferences($model, $meta);
 
+        $this->afterUpsert($model, $record, $meta, created: true);
+
         return $model;
+    }
+
+    /**
+     * Hook for state that cannot be expressed as fillable attributes.
+     *
+     * `recordToAttributes()` can only describe columns on the row itself, so a
+     * record whose content belongs in related tables — revisions, snapshots,
+     * translations, attachments — has nowhere to put it and is silently dropped
+     * by `fill()`. This runs once the model is persisted and has a key.
+     *
+     * `$created` distinguishes the two cases that usually need different
+     * handling: seeding initial state versus recording a subsequent change.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function afterUpsert(Model $model, Data $record, array $meta, bool $created): void
+    {
+        // No-op by default.
     }
 
     /**

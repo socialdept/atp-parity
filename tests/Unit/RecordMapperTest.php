@@ -324,4 +324,71 @@ class RecordMapperTest extends TestCase
         $this->assertTrue($model->exists);
         $this->assertSame('Known user record', $model->content);
     }
+
+    public function test_after_upsert_runs_on_create_and_reports_it_as_a_create(): void
+    {
+        $seen = [];
+        $mapper = new class($seen) extends TestMapper
+        {
+            public function __construct(public array &$seen) {}
+
+            protected function afterUpsert(\Illuminate\Database\Eloquent\Model $model, \SocialDept\AtpSchema\Data\Data $record, array $meta, bool $created): void
+            {
+                $this->seen[] = ['key' => $model->getKey(), 'created' => $created];
+            }
+        };
+
+        $mapper->upsert(new TestRecord(text: 'Hello'), ['uri' => 'at://did:plc:test/app.test.record/new']);
+
+        // Must run after save, or the model has no key to hang related rows off.
+        $this->assertCount(1, $seen);
+        $this->assertNotNull($seen[0]['key']);
+        $this->assertTrue($seen[0]['created']);
+    }
+
+    public function test_after_upsert_reports_an_update_as_not_created(): void
+    {
+        TestModel::create([
+            'content' => 'old',
+            'atp_uri' => 'at://did:plc:test/app.test.record/existing',
+        ]);
+
+        $seen = [];
+        $mapper = new class($seen) extends TestMapper
+        {
+            public function __construct(public array &$seen) {}
+
+            protected function afterUpsert(\Illuminate\Database\Eloquent\Model $model, \SocialDept\AtpSchema\Data\Data $record, array $meta, bool $created): void
+            {
+                $this->seen[] = $created;
+            }
+        };
+
+        $mapper->upsert(new TestRecord(text: 'new'), ['uri' => 'at://did:plc:test/app.test.record/existing']);
+
+        $this->assertSame([false], $seen);
+    }
+
+    public function test_after_upsert_does_not_run_when_the_import_is_refused(): void
+    {
+        $ran = false;
+        $mapper = new class($ran) extends TestMapper
+        {
+            public function __construct(public bool &$ran) {}
+
+            public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
+            {
+                return false;
+            }
+
+            protected function afterUpsert(\Illuminate\Database\Eloquent\Model $model, \SocialDept\AtpSchema\Data\Data $record, array $meta, bool $created): void
+            {
+                $this->ran = true;
+            }
+        };
+
+        $mapper->upsert(new TestRecord(text: 'nope'), ['uri' => 'at://did:plc:test/app.test.record/refused']);
+
+        $this->assertFalse($ran);
+    }
 }
