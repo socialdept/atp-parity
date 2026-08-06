@@ -14,11 +14,13 @@ use SocialDept\AtpParity\Commands\ImportCommand;
 use SocialDept\AtpParity\Commands\ImportStatusCommand;
 use SocialDept\AtpParity\Commands\MakeMapperCommand;
 use SocialDept\AtpParity\Contracts\BlobStorage;
+use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\PendingSyncStore;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
 use SocialDept\AtpParity\Listeners\RetryPendingSyncsOnAuth;
+use SocialDept\AtpParity\DeferredReference\DatabaseDeferredReferenceStore;
 use SocialDept\AtpParity\PendingSync\CachePendingSyncStore;
 use SocialDept\AtpParity\PendingSync\DatabasePendingSyncStore;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
@@ -195,6 +197,8 @@ class ParityServiceProvider extends ServiceProvider
      */
     protected function registerPendingSyncServices(): void
     {
+        $this->app->singleton(DeferredReferenceStore::class, fn () => new DatabaseDeferredReferenceStore());
+
         $this->app->singleton(PendingSyncStore::class, function ($app) {
             $storage = config('atp-parity.pending_syncs.storage', 'cache');
 
@@ -277,6 +281,7 @@ class ParityServiceProvider extends ServiceProvider
         ], 'parity-stubs');
 
         $this->commands([
+            Commands\PruneDeferredReferencesCommand::class,
             DiscoverCommand::class,
             ExportCommand::class,
             ImportCommand::class,
@@ -312,6 +317,11 @@ class ParityServiceProvider extends ServiceProvider
         $this->publishesMigrations([
             $path.'/create_parity_pending_syncs_table.php' => $dest.'/0000_00_00_000004_create_parity_pending_syncs_table.php',
         ], 'parity-migrations-pending-syncs');
+
+        // Optional: Parking orphaned reference records (deferred_references.enabled)
+        $this->publishesMigrations([
+            $path.'/create_parity_deferred_references_table.php' => $dest.'/0000_00_00_000005_create_parity_deferred_references_table.php',
+        ], 'parity-migrations-deferred-references');
     }
 
     public function provides(): array

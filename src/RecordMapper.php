@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpSchema\Data\BlobReference;
+use Illuminate\Support\Facades\Log;
+use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
+use SocialDept\AtpParity\Events\DeferredReferenceResolved;
 use SocialDept\AtpSchema\Data\Data;
 
 /**
@@ -82,6 +85,18 @@ abstract class RecordMapper implements RecordMapperContract
         return config('atp-parity.columns.synced_at', 'atp_synced_at');
     }
 
+    /**
+     * Get the column name for storing the record's rkey, or null to skip it.
+     *
+     * Opt-in: only apps that read the rkey back — for routing, reconciliation,
+     * or building canonical paths — need it stored, and an app that assigns the
+     * rkey itself on create must have imports overwrite it with the real one.
+     */
+    protected function rkeyColumn(): ?string
+    {
+        return config('atp-parity.columns.rkey');
+    }
+
     public function toModel(Data $record, array $meta = []): Model
     {
         $modelClass = $this->modelClass();
@@ -138,16 +153,19 @@ abstract class RecordMapper implements RecordMapperContract
 
     public function upsert(Data $record, array $meta = []): ?Model
     {
-        // Check if import should proceed
-        if (! $this->shouldImport($record, $meta)) {
+        $uri = $meta['uri'] ?? null;
+        $existing = $uri ? $this->findByUri($uri) : null;
+
+        // Resolved before the gate and handed over in `$meta['existing']`, so a
+        // mapper can tell a create from an update without querying again — the
+        // same row was otherwise fetched three times per event. Passed through
+        // meta rather than a fourth parameter: changing the signature would
+        // break every mapper that overrides this, in every consuming app.
+        if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
             return null;
         }
 
-        $uri = $meta['uri'] ?? null;
-
         if ($uri) {
-            $existing = $this->findByUri($uri);
-
             if ($existing) {
                 $this->updateModel($existing, $record, $meta);
                 $existing->save();
@@ -159,7 +177,71 @@ abstract class RecordMapper implements RecordMapperContract
         $model = $this->toModel($record, $meta);
         $model->save();
 
+        // A create is the only moment a parked reference becomes actionable: if
+        // the target had existed, the reference would have applied directly.
+        // Updates skip this entirely.
+        $this->replayDeferredReferences($model, $meta);
+
         return $model;
+    }
+
+    /**
+     * Apply any reference records that arrived before this model existed.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function replayDeferredReferences(Model $model, array $meta): void
+    {
+        $uri = $meta['uri'] ?? null;
+
+        if (! $uri || ! config('atp-parity.deferred_references.enabled', true)) {
+            return;
+        }
+
+        $store = app(DeferredReferenceStore::class);
+        $registry = app(MapperRegistry::class);
+
+        try {
+            $awaiting = $store->awaiting($uri);
+        } catch (\Throwable $e) {
+            // Never let replay break the create it follows. The commonest cause
+            // is an app that upgraded without publishing the migration; the
+            // record itself is still saved and correct.
+            Log::warning('[Parity] Deferred reference store unavailable', ['error' => $e->getMessage()]);
+
+            return;
+        }
+
+        foreach ($awaiting as $deferred) {
+            $mapper = $registry->forLexicon($deferred->collection);
+
+            // The mapper went away (unregistered collection) — drop it rather
+            // than leaving it parked forever.
+            if (! $mapper) {
+                $store->release($deferred->referenceUri);
+
+                continue;
+            }
+
+            try {
+                $recordClass = $mapper->recordClass();
+                $mapper->upsert($recordClass::fromArray($deferred->record), $deferred->meta());
+            } catch (\Throwable $e) {
+                // Leave it parked: a malformed body or a transient failure should
+                // not consume the reference. The TTL sweep is the backstop.
+                Log::warning('[Parity] Deferred reference replay failed', [
+                    'reference_uri' => $deferred->referenceUri,
+                    'target_uri' => $deferred->targetUri,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            $store->release($deferred->referenceUri);
+
+            event(new DeferredReferenceResolved($deferred->referenceUri, $deferred->targetUri));
+        }
     }
 
     public function deleteByUri(string $uri): bool
@@ -184,6 +266,10 @@ abstract class RecordMapper implements RecordMapperContract
 
         if (isset($meta['cid'])) {
             $attributes[$this->cidColumn()] = $meta['cid'];
+        }
+
+        if (isset($meta['rkey']) && ($rkeyColumn = $this->rkeyColumn())) {
+            $attributes[$rkeyColumn] = $meta['rkey'];
         }
 
         // Always set synced_at when applying meta

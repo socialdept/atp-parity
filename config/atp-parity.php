@@ -32,6 +32,12 @@ return [
         'uri' => 'atp_uri',
         'cid' => 'atp_cid',
         'synced_at' => 'atp_synced_at',
+
+        // Optional. When set, imports stamp the record's real rkey here. An app
+        // that assigns an rkey locally before the record exists remotely will
+        // otherwise hold a value that disagrees with the repo, which matters the
+        // moment anything routes or reconciles by rkey. Null = do not track.
+        'rkey' => null,
     ],
 
     /*
@@ -153,6 +159,33 @@ return [
     | authentication failures (expired tokens, invalid sessions).
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Deferred References
+    |--------------------------------------------------------------------------
+    |
+    | Reference records carry only a strong-ref at a main record, so they cannot
+    | be applied until that record exists locally. Delivery order is not
+    | guaranteed, and dropping an orphan is silent data loss — the delivering
+    | consumer has already acked it. Orphans are parked here and replayed when
+    | their target is created.
+    |
+    */
+    'deferred_references' => [
+        'enabled' => env('PARITY_DEFERRED_REFERENCES_ENABLED', true),
+
+        'table' => 'parity_deferred_references',
+
+        // null = default connection
+        'connection' => null,
+
+        // How long an orphan waits before being pruned. Generous on purpose: a
+        // reference pointing at a record we will never hold is indistinguishable
+        // at park time from one pointing at a record that is merely late, so
+        // prefer a long window plus a visible count over aggressive expiry.
+        'ttl_days' => (int) env('PARITY_DEFERRED_REFERENCES_TTL_DAYS', 7),
+    ],
+
     'pending_syncs' => [
         // Enable pending sync capture (opt-in)
         'enabled' => env('PARITY_PENDING_SYNCS_ENABLED', false),
