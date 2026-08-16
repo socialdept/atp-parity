@@ -5,8 +5,8 @@ namespace SocialDept\AtpParity\Tests\Unit\Sync;
 use Illuminate\Support\Facades\Event;
 use Mockery;
 use SocialDept\AtpParity\Events\RecordSynced;
-use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\Events\ReferenceSynced;
+use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
 use SocialDept\AtpParity\Sync\SyncService;
@@ -82,7 +82,7 @@ class ReferenceSyncServiceTest extends TestCase
     public function test_sync_with_reference_fails_when_no_main_mapper(): void
     {
         // Create a mapper without a registered main mapper
-        $mapper = new class extends TestReferenceMapper {
+        $mapper = new class () extends TestReferenceMapper {
             public function mainMapper(): ?\SocialDept\AtpParity\Contracts\RecordMapper
             {
                 return null;

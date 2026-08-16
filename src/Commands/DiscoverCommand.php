@@ -3,11 +3,12 @@
 namespace SocialDept\AtpParity\Commands;
 
 use Illuminate\Console\Command;
-use SocialDept\AtpParity\Discovery\DiscoveryService;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
+
+use SocialDept\AtpParity\Discovery\DiscoveryService;
 
 class DiscoverCommand extends Command
 {

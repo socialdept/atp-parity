@@ -21,7 +21,8 @@ class RetryPendingSyncsOnAuth
 {
     public function __construct(
         protected PendingSyncManager $manager,
-    ) {}
+    ) {
+    }
 
     /**
      * Handle the SessionAuthenticated event.

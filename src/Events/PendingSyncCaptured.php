@@ -16,5 +16,6 @@ class PendingSyncCaptured
     public function __construct(
         public readonly PendingSync $pendingSync,
         public readonly Model $model,
-    ) {}
+    ) {
+    }
 }

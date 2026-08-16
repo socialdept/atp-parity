@@ -13,5 +13,6 @@ class BlobDownloaded
     public function __construct(
         public readonly BlobMapping $mapping,
         public readonly BlobReference $blob,
-    ) {}
+    ) {
+    }
 }

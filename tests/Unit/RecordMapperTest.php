@@ -230,7 +230,7 @@ class RecordMapperTest extends TestCase
 
     public function test_upsert_returns_null_when_should_import_returns_false(): void
     {
-        $mapper = new class extends TestMapper {
+        $mapper = new class () extends TestMapper {
             public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
             {
                 return false;
@@ -252,7 +252,7 @@ class RecordMapperTest extends TestCase
 
     public function test_upsert_does_not_create_model_when_should_import_returns_false(): void
     {
-        $mapper = new class extends TestMapper {
+        $mapper = new class () extends TestMapper {
             public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
             {
                 return false;
@@ -275,8 +275,10 @@ class RecordMapperTest extends TestCase
     {
         $receivedMeta = null;
 
-        $mapper = new class($receivedMeta) extends TestMapper {
-            public function __construct(private ?array &$receivedMeta) {}
+        $mapper = new class ($receivedMeta) extends TestMapper {
+            public function __construct(private ?array &$receivedMeta)
+            {
+            }
 
             public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
             {
@@ -302,7 +304,7 @@ class RecordMapperTest extends TestCase
 
     public function test_upsert_proceeds_when_should_import_returns_true(): void
     {
-        $mapper = new class extends TestMapper {
+        $mapper = new class () extends TestMapper {
             public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
             {
                 // Only import if did is known
@@ -328,9 +330,10 @@ class RecordMapperTest extends TestCase
     public function test_after_upsert_runs_on_create_and_reports_it_as_a_create(): void
     {
         $seen = [];
-        $mapper = new class($seen) extends TestMapper
-        {
-            public function __construct(public array &$seen) {}
+        $mapper = new class ($seen) extends TestMapper {
+            public function __construct(public array &$seen)
+            {
+            }
 
             protected function afterUpsert(\Illuminate\Database\Eloquent\Model $model, \SocialDept\AtpSchema\Data\Data $record, array $meta, bool $created): void
             {
@@ -354,9 +357,10 @@ class RecordMapperTest extends TestCase
         ]);
 
         $seen = [];
-        $mapper = new class($seen) extends TestMapper
-        {
-            public function __construct(public array &$seen) {}
+        $mapper = new class ($seen) extends TestMapper {
+            public function __construct(public array &$seen)
+            {
+            }
 
             protected function afterUpsert(\Illuminate\Database\Eloquent\Model $model, \SocialDept\AtpSchema\Data\Data $record, array $meta, bool $created): void
             {
@@ -372,9 +376,10 @@ class RecordMapperTest extends TestCase
     public function test_after_upsert_does_not_run_when_the_import_is_refused(): void
     {
         $ran = false;
-        $mapper = new class($ran) extends TestMapper
-        {
-            public function __construct(public bool &$ran) {}
+        $mapper = new class ($ran) extends TestMapper {
+            public function __construct(public bool &$ran)
+            {
+            }
 
             public function shouldImport(\SocialDept\AtpSchema\Data\Data $record, array $meta = []): bool
             {

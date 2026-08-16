@@ -21,5 +21,6 @@ class RecordConstructionFailed
         public readonly string $collection,
         public readonly string $rkey,
         public readonly string $error,
-    ) {}
+    ) {
+    }
 }

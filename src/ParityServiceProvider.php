@@ -16,11 +16,11 @@ use SocialDept\AtpParity\Commands\MakeMapperCommand;
 use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\PendingSyncStore;
+use SocialDept\AtpParity\DeferredReference\DatabaseDeferredReferenceStore;
 use SocialDept\AtpParity\Discovery\DiscoveryService;
 use SocialDept\AtpParity\Export\ExportService;
 use SocialDept\AtpParity\Import\ImportService;
 use SocialDept\AtpParity\Listeners\RetryPendingSyncsOnAuth;
-use SocialDept\AtpParity\DeferredReference\DatabaseDeferredReferenceStore;
 use SocialDept\AtpParity\PendingSync\CachePendingSyncStore;
 use SocialDept\AtpParity\PendingSync\DatabasePendingSyncStore;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
@@ -203,7 +203,7 @@ class ParityServiceProvider extends ServiceProvider
             $storage = config('atp-parity.pending_syncs.storage', 'cache');
 
             if ($storage === 'database') {
-                return new DatabasePendingSyncStore;
+                return new DatabasePendingSyncStore();
             }
 
             $cacheStore = config('atp-parity.pending_syncs.cache_store');

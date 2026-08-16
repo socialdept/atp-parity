@@ -14,7 +14,8 @@ readonly class ConflictResolution
         public string $winner,
         public ?Model $model = null,
         public ?PendingConflict $pending = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the conflict was resolved.

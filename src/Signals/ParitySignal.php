@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\Contracts\ResolvesConflictStrategy;
+use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\ConflictResolved;
 use SocialDept\AtpParity\Events\RecordConstructionFailed;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ConflictDetector;
 use SocialDept\AtpParity\Sync\ConflictResolver;
-use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Sync\ConflictStrategy;
 use SocialDept\AtpSchema\Data\Data;
 use SocialDept\AtpSignals\Events\SignalEvent;
@@ -50,8 +50,8 @@ class ParitySignal extends Signal
     public function __construct(
         protected MapperRegistry $registry
     ) {
-        $this->conflictDetector = new ConflictDetector;
-        $this->conflictResolver = new ConflictResolver;
+        $this->conflictDetector = new ConflictDetector();
+        $this->conflictResolver = new ConflictResolver();
     }
 
     /**

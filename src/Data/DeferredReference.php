@@ -32,7 +32,8 @@ readonly class DeferredReference
         public ?string $cid,
         public array $record,
         public DateTimeImmutable $parkedAt,
-    ) {}
+    ) {
+    }
 
     /**
      * @param  array<string, mixed>  $attributes

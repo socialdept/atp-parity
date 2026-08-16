@@ -16,7 +16,8 @@ readonly class PendingSyncRetryResult
         public int $failed,
         public int $skipped,
         public array $errors = [],
-    ) {}
+    ) {
+    }
 
     /**
      * Check if any retries failed.

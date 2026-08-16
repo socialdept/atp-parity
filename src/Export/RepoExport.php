@@ -11,7 +11,8 @@ readonly class RepoExport
         public string $did,
         public string $carData,
         public int $size,
-    ) {}
+    ) {
+    }
 
     /**
      * Save the CAR data to a file.

@@ -6,8 +6,8 @@ use Illuminate\Http\UploadedFile;
 use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Enums\BlobUrlStrategy;
-use SocialDept\AtpSupport\Facades\Resolver;
 use SocialDept\AtpSchema\Data\BlobReference;
+use SocialDept\AtpSupport\Facades\Resolver;
 use SplFileInfo;
 
 /**
@@ -22,7 +22,8 @@ class BlobManager
         protected BlobStorage $storage,
         protected BlobDownloader $downloader,
         protected BlobUploader $uploader,
-    ) {}
+    ) {
+    }
 
     /**
      * Get the configured storage driver.

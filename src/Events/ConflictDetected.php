@@ -19,5 +19,6 @@ class ConflictDetected
         public readonly Data $record,
         public readonly array $meta,
         public readonly PendingConflict $conflict,
-    ) {}
+    ) {
+    }
 }

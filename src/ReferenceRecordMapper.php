@@ -2,17 +2,17 @@
 
 namespace SocialDept\AtpParity;
 
-use Illuminate\Database\Eloquent\Model;
-use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
-use SocialDept\AtpParity\Contracts\ReferenceMapper;
-use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
-use SocialDept\AtpParity\Enums\ReferenceFormat;
 use DateTimeImmutable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
+use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
+use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Data\DeferredReference;
+use SocialDept\AtpParity\Enums\ReferenceFormat;
 use SocialDept\AtpParity\Events\DeferredReferenceParked;
 use SocialDept\AtpSchema\Data\Data;
+use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 
 /**
  * Abstract base class for reference record mappers.
@@ -257,10 +257,10 @@ abstract class ReferenceRecordMapper extends RecordMapper implements ReferenceMa
             app(DeferredReferenceStore::class)->park(new DeferredReference(
                 referenceUri: $meta['uri'] ?? '',
                 targetUri: $targetUri,
-                    collection: $this->lexicon(),
-                    did: $meta['did'] ?? '',
-                    cid: $meta['cid'] ?? null,
-                    record: $record->toArray(),
+                collection: $this->lexicon(),
+                did: $meta['did'] ?? '',
+                cid: $meta['cid'] ?? null,
+                record: $record->toArray(),
                 parkedAt: new DateTimeImmutable(),
             ));
         } catch (\Throwable $e) {

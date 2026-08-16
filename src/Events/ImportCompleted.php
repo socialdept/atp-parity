@@ -11,5 +11,6 @@ class ImportCompleted
 
     public function __construct(
         public readonly ImportResult $result,
-    ) {}
+    ) {
+    }
 }

@@ -12,7 +12,8 @@ readonly class SyncResult
         public ?string $uri = null,
         public ?string $cid = null,
         public ?string $error = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the sync operation succeeded.

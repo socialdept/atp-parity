@@ -19,7 +19,8 @@ readonly class PendingSync
         public ?string $referenceMapperClass,
         public CarbonImmutable $createdAt,
         public int $attempts = 0,
-    ) {}
+    ) {
+    }
 
     /**
      * Convert to array for storage.

@@ -28,7 +28,7 @@ class ParitySignalBackfillTest extends TestCase
     {
         parent::setUp();
 
-        app(MapperRegistry::class)->register(new TestMapper);
+        app(MapperRegistry::class)->register(new TestMapper());
         $this->signal = app(ParitySignal::class);
     }
 
@@ -137,8 +137,12 @@ class ParitySignalBackfillTest extends TestCase
             timeUs: 1,
             kind: 'commit',
             commit: new CommitEvent(
-                rev: 'r', operation: 'create', collection: 'app.test.record',
-                rkey: 'broken', record: (object) ['text' => ['not', 'a', 'string']], cid: 'bafyreibroken',
+                rev: 'r',
+                operation: 'create',
+                collection: 'app.test.record',
+                rkey: 'broken',
+                record: (object) ['text' => ['not', 'a', 'string']],
+                cid: 'bafyreibroken',
             ),
             backfill: false,
         );

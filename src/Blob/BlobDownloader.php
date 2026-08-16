@@ -7,8 +7,8 @@ use SocialDept\AtpParity\Contracts\BlobStorage;
 use SocialDept\AtpParity\Enums\BlobSource;
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Events\BlobDownloaded;
-use SocialDept\AtpSupport\Facades\Resolver;
 use SocialDept\AtpSchema\Data\BlobReference;
+use SocialDept\AtpSupport\Facades\Resolver;
 use Throwable;
 
 /**
@@ -18,7 +18,8 @@ class BlobDownloader
 {
     public function __construct(
         protected BlobStorage $storage,
-    ) {}
+    ) {
+    }
 
     /**
      * Download blob content from AT Protocol without storing.

@@ -17,7 +17,7 @@ class DatabasePendingSyncStoreTest extends TestCase
     {
         parent::setUp();
 
-        $this->store = new DatabasePendingSyncStore;
+        $this->store = new DatabasePendingSyncStore();
     }
 
     public function test_can_store_and_retrieve_pending_sync(): void

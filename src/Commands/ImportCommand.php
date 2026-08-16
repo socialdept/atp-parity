@@ -3,15 +3,16 @@
 namespace SocialDept\AtpParity\Commands;
 
 use Illuminate\Console\Command;
-use SocialDept\AtpParity\Events\ImportProgress;
-use SocialDept\AtpParity\Import\ImportService;
-use SocialDept\AtpParity\Jobs\ImportUserJob;
-use SocialDept\AtpParity\MapperRegistry;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\warning;
+
+use SocialDept\AtpParity\Events\ImportProgress;
+use SocialDept\AtpParity\Import\ImportService;
+use SocialDept\AtpParity\Jobs\ImportUserJob;
+use SocialDept\AtpParity\MapperRegistry;
 
 class ImportCommand extends Command
 {

@@ -15,5 +15,6 @@ class RecordUnsynced
     public function __construct(
         public readonly Model $model,
         public readonly string $uri,
-    ) {}
+    ) {
+    }
 }

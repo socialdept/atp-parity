@@ -13,7 +13,8 @@ readonly class DiscoveryResult
         public int $total = 0,
         public ?string $error = null,
         public bool $incomplete = false,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the discovery operation succeeded.

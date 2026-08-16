@@ -18,7 +18,8 @@ class SyncService
 {
     public function __construct(
         protected MapperRegistry $registry
-    ) {}
+    ) {
+    }
 
     /**
      * Sync a model as a new record to AT Protocol.

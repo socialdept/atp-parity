@@ -29,7 +29,8 @@ class PendingSyncManager
         protected SyncService $syncService,
         protected ReferenceSyncService $referenceSyncService,
         protected MapperRegistry $registry,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if pending syncs feature is enabled.

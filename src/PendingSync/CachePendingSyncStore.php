@@ -12,7 +12,8 @@ class CachePendingSyncStore implements PendingSyncStore
     public function __construct(
         protected Repository $cache,
         protected int $ttl = 3600,
-    ) {}
+    ) {
+    }
 
     /**
      * Store a pending sync operation.

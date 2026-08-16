@@ -19,5 +19,6 @@ class ReferenceSyncFailed
         public readonly Model $model,
         public readonly string $error,
         public readonly ?string $referenceUri = null,
-    ) {}
+    ) {
+    }
 }

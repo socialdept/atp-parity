@@ -3,9 +3,9 @@
 namespace SocialDept\AtpParity\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
-use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use SocialDept\AtpParity\Enums\ReferenceFormat;
 use SocialDept\AtpSchema\Data\Data;
+use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 
 /**
  * Contract for mappers that handle reference records.

@@ -142,8 +142,7 @@ class ParitySignalBlobSyncTest extends TestCase
     public function test_sync_blobs_if_changed_skips_when_model_lacks_method(): void
     {
         // Use a model without syncAtpBlobsToMedia method
-        $model = new class extends Model
-        {
+        $model = new class () extends Model {
             protected $table = 'test_models';
 
             protected $guarded = [];

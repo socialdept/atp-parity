@@ -16,7 +16,8 @@ readonly class ImportResult
         public bool $completed,
         public ?string $cursor = null,
         public ?string $error = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the import completed successfully.

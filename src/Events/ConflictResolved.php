@@ -22,5 +22,6 @@ class ConflictResolved
         public readonly ConflictStrategy $strategy,
         public readonly ?string $winner,
         public readonly string $uri,
-    ) {}
+    ) {
+    }
 }
