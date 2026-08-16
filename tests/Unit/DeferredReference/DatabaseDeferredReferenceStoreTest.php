@@ -15,7 +15,7 @@ class DatabaseDeferredReferenceStoreTest extends TestCase
     {
         parent::setUp();
 
-        $this->store = new DatabaseDeferredReferenceStore;
+        $this->store = new DatabaseDeferredReferenceStore();
     }
 
     private function reference(
@@ -30,7 +30,7 @@ class DatabaseDeferredReferenceStoreTest extends TestCase
             did: 'did:plc:a',
             cid: 'bafyreiabc',
             record: ['document' => $targetUri],
-            parkedAt: $parkedAt ?? new DateTimeImmutable,
+            parkedAt: $parkedAt ?? new DateTimeImmutable(),
         );
     }
 

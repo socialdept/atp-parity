@@ -231,8 +231,7 @@ class SyncServiceTest extends TestCase
     public function test_model_with_custom_rkey_returns_expected_value(): void
     {
         // Create a model with custom rkey implementation
-        $model = new class(['content' => 'Test']) extends TestModel
-        {
+        $model = new class (['content' => 'Test']) extends TestModel {
             public function getDesiredAtpRkey(): ?string
             {
                 return 'my-custom-rkey';

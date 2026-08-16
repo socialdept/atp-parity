@@ -8,5 +8,7 @@ class DeferredReferenceResolved
 {
     use Dispatchable;
 
-    public function __construct(public string $referenceUri, public string $targetUri) {}
+    public function __construct(public string $referenceUri, public string $targetUri)
+    {
+    }
 }

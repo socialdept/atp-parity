@@ -2,7 +2,6 @@
 
 namespace SocialDept\AtpParity\Export;
 
-use BackedEnum;
 use Generator;
 use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Import\ImportService;
@@ -17,7 +16,8 @@ class ExportService
     public function __construct(
         protected MapperRegistry $registry,
         protected ImportService $importService
-    ) {}
+    ) {
+    }
 
     /**
      * Download a user's repository as CAR data.

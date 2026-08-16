@@ -17,7 +17,8 @@ readonly class ReferenceSyncResult
         public ?string $referenceCid = null,
         public ?string $error = null,
         public ?string $referenceError = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the sync was successful.

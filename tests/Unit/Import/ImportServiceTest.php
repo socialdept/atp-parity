@@ -3,16 +3,11 @@
 namespace SocialDept\AtpParity\Tests\Unit\Import;
 
 use Illuminate\Support\Facades\Event;
-use Mockery;
-use SocialDept\AtpParity\Events\ImportCompleted;
 use SocialDept\AtpParity\Events\ImportFailed;
-use SocialDept\AtpParity\Events\ImportProgress;
-use SocialDept\AtpParity\Events\ImportStarted;
 use SocialDept\AtpParity\Import\ImportService;
 use SocialDept\AtpParity\Import\ImportState;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Tests\Fixtures\TestMapper;
-use SocialDept\AtpParity\Tests\Fixtures\TestModel;
 use SocialDept\AtpParity\Tests\TestCase;
 use SocialDept\AtpSupport\Facades\Resolver;
 

@@ -12,5 +12,6 @@ class ImportFailed
         public readonly string $did,
         public readonly string $collection,
         public readonly string $error,
-    ) {}
+    ) {
+    }
 }

@@ -30,7 +30,7 @@ class DeferredReferenceFlowTest extends TestCase
     {
         parent::setUp();
 
-        $this->mapper = new TestAtUriReferenceMapper;
+        $this->mapper = new TestAtUriReferenceMapper();
         $this->store = app(DeferredReferenceStore::class);
     }
 

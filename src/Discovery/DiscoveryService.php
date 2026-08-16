@@ -15,7 +15,8 @@ class DiscoveryService
 {
     public function __construct(
         protected ImportService $importService
-    ) {}
+    ) {
+    }
 
     /**
      * Discover all DIDs with records in a collection.

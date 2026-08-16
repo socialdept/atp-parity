@@ -12,7 +12,8 @@ readonly class ExportResult
         public ?string $path = null,
         public ?int $size = null,
         public ?string $error = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the export operation succeeded.

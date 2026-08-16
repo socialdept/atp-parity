@@ -16,5 +16,6 @@ class RecordSynced
         public readonly Model $model,
         public readonly string $uri,
         public readonly string $cid,
-    ) {}
+    ) {
+    }
 }

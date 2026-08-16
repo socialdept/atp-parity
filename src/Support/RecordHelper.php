@@ -28,7 +28,8 @@ class RecordHelper
 
     public function __construct(
         protected MapperRegistry $registry
-    ) {}
+    ) {
+    }
 
     /**
      * Get or create a client for a PDS endpoint.

@@ -5,7 +5,6 @@ namespace SocialDept\AtpParity\Import;
 use SocialDept\AtpClient\AtpClient;
 use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Blob\BlobManager;
-use SocialDept\AtpParity\Concerns\HasAtpBlobs;
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Events\ImportCompleted;
 use SocialDept\AtpParity\Events\ImportFailed;
@@ -32,7 +31,8 @@ class ImportService
 
     public function __construct(
         protected MapperRegistry $registry
-    ) {}
+    ) {
+    }
 
     /**
      * Import all records for a user in registered collections.

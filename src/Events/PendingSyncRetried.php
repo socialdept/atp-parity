@@ -15,5 +15,6 @@ class PendingSyncRetried
     public function __construct(
         public readonly PendingSync $pendingSync,
         public readonly bool $success,
-    ) {}
+    ) {
+    }
 }

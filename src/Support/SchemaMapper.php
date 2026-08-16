@@ -51,7 +51,8 @@ class SchemaMapper extends RecordMapper
         protected string $modelClass,
         protected Closure $toAttributes,
         protected Closure $toRecordData,
-    ) {}
+    ) {
+    }
 
     public function recordClass(): string
     {

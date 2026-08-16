@@ -3,12 +3,12 @@
 namespace SocialDept\AtpParity\Commands;
 
 use Illuminate\Console\Command;
-use SocialDept\AtpParity\Events\ImportProgress;
-use SocialDept\AtpParity\Export\ExportService;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
+
+use SocialDept\AtpParity\Events\ImportProgress;
+use SocialDept\AtpParity\Export\ExportService;
 
 class ExportCommand extends Command
 {

@@ -17,5 +17,6 @@ class ReferenceSynced
         public readonly string $referenceUri,
         public readonly string $referenceCid,
         public readonly ?string $mainUri = null,
-    ) {}
+    ) {
+    }
 }

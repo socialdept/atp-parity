@@ -11,5 +11,6 @@ class ImportStarted
     public function __construct(
         public readonly string $did,
         public readonly string $collection,
-    ) {}
+    ) {
+    }
 }

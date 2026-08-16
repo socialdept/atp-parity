@@ -3,8 +3,8 @@
 namespace SocialDept\AtpParity\Concerns;
 
 use SocialDept\AtpParity\Contracts\ReferenceMapper;
-use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 
 /**
  * Trait for Eloquent models that have both a main record and a reference record.

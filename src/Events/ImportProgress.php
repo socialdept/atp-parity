@@ -13,5 +13,6 @@ class ImportProgress
         public readonly string $collection,
         public readonly int $recordsSynced,
         public readonly ?string $cursor = null,
-    ) {}
+    ) {
+    }
 }

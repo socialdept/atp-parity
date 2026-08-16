@@ -3,12 +3,12 @@
 namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
-use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
-use SocialDept\AtpParity\Enums\ValidationMode;
-use SocialDept\AtpSchema\Data\BlobReference;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
+use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
+use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
+use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
 
 /**

@@ -9,7 +9,8 @@ class TestReferenceRecord extends Data
     public function __construct(
         public readonly ?array $subject = null,
         public readonly ?string $document = null,
-    ) {}
+    ) {
+    }
 
     public static function getLexicon(): string
     {

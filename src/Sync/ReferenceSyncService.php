@@ -8,10 +8,10 @@ use SocialDept\AtpClient\Exceptions\AuthenticationException;
 use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
 use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Contracts\ReferenceMapper;
-use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
-use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\Events\ReferenceSynced;
+use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use Throwable;
 
 /**
@@ -25,7 +25,8 @@ class ReferenceSyncService
     public function __construct(
         protected MapperRegistry $registry,
         protected SyncService $syncService
-    ) {}
+    ) {
+    }
 
     /**
      * Sync both main and reference records atomically.

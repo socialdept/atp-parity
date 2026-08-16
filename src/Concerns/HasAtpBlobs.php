@@ -4,7 +4,6 @@ namespace SocialDept\AtpParity\Concerns;
 
 use SocialDept\AtpParity\Blob\BlobManager;
 use SocialDept\AtpParity\Blob\BlobMapping;
-use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpSchema\Data\BlobReference;
 
 /**

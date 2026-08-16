@@ -2,10 +2,10 @@
 
 namespace SocialDept\AtpParity\Concerns;
 
-use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use SocialDept\AtpParity\Sync\ReferenceSyncResult;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
 use SocialDept\AtpParity\Sync\SyncResult;
+use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 
 /**
  * Trait providing manual sync methods for models with reference records.

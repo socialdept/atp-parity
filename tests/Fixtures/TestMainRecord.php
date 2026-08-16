@@ -12,7 +12,8 @@ class TestMainRecord extends Data
     public function __construct(
         public readonly string $title,
         public readonly ?string $createdAt = null,
-    ) {}
+    ) {
+    }
 
     public static function getLexicon(): string
     {

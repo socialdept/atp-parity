@@ -18,7 +18,8 @@ class BlobUploader
 {
     public function __construct(
         protected BlobStorage $storage,
-    ) {}
+    ) {
+    }
 
     /**
      * Upload a file to AT Protocol.
