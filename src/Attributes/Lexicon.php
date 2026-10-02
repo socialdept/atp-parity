@@ -10,8 +10,9 @@ use Attribute;
 #[Attribute(Attribute::TARGET_CLASS)]
 final class Lexicon
 {
-    public function __construct(public string $nsid)
-    {
+    public function __construct(
+        public string $nsid,
+    ) {
         //
     }
 }

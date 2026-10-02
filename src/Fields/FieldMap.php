@@ -15,8 +15,9 @@ class FieldMap
     /**
      * @param  array<string, Field|string>  $fields
      */
-    public function __construct(protected array $fields)
-    {
+    public function __construct(
+        protected array $fields,
+    ) {
         //
     }
 

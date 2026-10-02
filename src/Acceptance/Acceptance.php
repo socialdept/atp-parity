@@ -17,8 +17,9 @@ class Acceptance
     /**
      * @param  Closure(Data, array<string, mixed>, RecordMapper): bool  $permits
      */
-    final private function __construct(protected Closure $permits)
-    {
+    final private function __construct(
+        protected Closure $permits,
+    ) {
         //
     }
 
