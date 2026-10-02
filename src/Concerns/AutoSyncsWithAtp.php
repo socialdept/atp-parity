@@ -82,15 +82,9 @@ trait AutoSyncsWithAtp
     /**
      * Whether this update could have changed anything the record contains.
      *
-     * An update to a column the record does not carry cannot change the record, so
-     * resyncing on it writes an identical record into a repo we do not own. A model
-     * row carries far more than its record does (counters, cached values, local
-     * settings), and every one of them was a trigger before this.
-     *
-     * Answers true whenever the question cannot be settled, because the cost of a
-     * wrong "no" is an edit that never reaches the PDS, while the cost of a wrong
-     * "yes" is a redundant write the CID comparison in SyncService then catches.
-     * The two layers fail in opposite directions on purpose.
+     * INFO: true whenever the question cannot be settled. A wrong "no" is an edit
+     * that never reaches the PDS, a wrong "yes" is a redundant write the CID
+     * comparison in SyncService catches.
      */
     protected static function recordCouldHaveChanged(Model $model): bool
     {
@@ -102,9 +96,8 @@ trait AutoSyncsWithAtp
 
         $columns = $mapper->recordColumns();
 
-        // Null is a mapper that writes its own directions, so its columns are not
-        // knowable. Empty is a declaration whose fields are all derived, where
-        // gating on columns would block every write.
+        // Null: directions written by hand, columns unknowable. Empty: all fields
+        // derived, so gating on columns would block every write.
         if ($columns === null || $columns === []) {
             return true;
         }

@@ -47,10 +47,8 @@ class SchemaMapper extends RecordMapper
      * @param  class-string<TModel>  $modelClass  The Eloquent model class
      * @param  Closure(TSchema): array  $toAttributes  Convert schema to model attributes
      * @param  Closure(TModel): array  $toRecordData  Convert model to record data
-     * @param  Acceptance|null  $accepts  Which records to accept from the network.
-     *                                    Null accepts nothing, because a mapper
-     *                                    assembled at a call site is still an ingest
-     *                                    boundary and must say what it allows.
+     * @param  Acceptance|null  $accepts  Which records to accept. Null accepts
+     *                                    nothing.
      */
     public function __construct(
         protected string $schemaClass,

@@ -5,9 +5,8 @@ namespace SocialDept\AtpParity\Upcasting;
 /**
  * What to do on write about a property a newer shape supersedes.
  *
- * A lexicon cannot drop a property that readers still expect, and it certainly
- * cannot drop a required one, so superseding a field is a transition rather than an
- * edit. Which half of the transition we are in is a decision per field.
+ * A lexicon cannot drop a property readers still expect, so superseding one is a
+ * transition, and which half of it we are in is a decision per field.
  */
 final class Deprecation
 {
@@ -20,10 +19,8 @@ final class Deprecation
     }
 
     /**
-     * Keep writing the old property, filled from the new one.
-     *
-     * The right answer while other clients still read it, which for a shared
-     * lexicon is a conversation rather than an assumption.
+     * Keep writing the old property, filled from the new one, while other clients
+     * still read it.
      */
     public static function dualWrite(string $property, string $from): self
     {
@@ -31,10 +28,7 @@ final class Deprecation
     }
 
     /**
-     * Stop writing the old property.
-     *
-     * Only once no reader needs it, which is a fact about the network and not about
-     * our code.
+     * Stop writing the old property, once no reader needs it.
      */
     public static function drop(string $property): self
     {

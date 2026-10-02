@@ -7,15 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordCodec;
 
 /**
- * Applies a mapper's `fields()` declaration in both directions.
- *
- * Keyed by record path, so a nested field is written `preferences.timezone` and
- * this class owns the traversal: reading a path off a hydrated record object
- * null-safely, and building the nested arrays a record needs on the way out.
- *
- * The third thing it does is the reason the declaration exists at all:
- * {@see self::columns()} reports which model columns feed the record, which no
- * amount of reading a hand-written `modelToRecordData()` can tell you.
+ * Applies a mapper's `fields()` declaration in both directions, and owns the
+ * dotted-path traversal that a nested field such as `preferences.timezone` needs.
  */
 class FieldMap
 {
@@ -33,11 +26,8 @@ class FieldMap
     }
 
     /**
-     * The model columns that end up in the record.
-     *
-     * A save touching none of these cannot change the record, so it is not worth
-     * a write. A field whose value is produced by a closure still declares its
-     * column, because a closure cannot be introspected.
+     * The model columns that end up in the record, so a save touching none of them
+     * can be known not to need a write.
      *
      * @return array<int, string>
      */
@@ -75,8 +65,6 @@ class FieldMap
     }
 
     /**
-     * Record to model attributes.
-     *
      * @return array<string, mixed>
      */
     public function toAttributes(object $record): array
@@ -105,8 +93,6 @@ class FieldMap
     }
 
     /**
-     * Model to record data, nested by path.
-     *
      * @return array<string, mixed>
      */
     public function toRecordData(Model $model): array
@@ -122,9 +108,8 @@ class FieldMap
 
             $value = $this->encode($field, $model);
 
-            // A null is an absent property rather than an explicit null: writing
-            // one would fail validation for a field the lexicon declares as
-            // optional-but-typed.
+            // INFO: absent, not null. Writing an explicit null fails validation for
+            // a field the lexicon declares optional but typed.
             if ($value === null) {
                 continue;
             }
@@ -220,8 +205,7 @@ class FieldMap
     }
 
     /**
-     * A record value that is itself a DTO becomes an array, so a field declared
-     * without a codec still lands as something a JSON column can hold.
+     * A DTO value becomes an array, so a field with no codec still fits a JSON column.
      */
     protected function plain(mixed $value): mixed
     {
@@ -232,9 +216,7 @@ class FieldMap
         return $value;
     }
 
-    /**
-     * Read a dotted path off a hydrated record, tolerating absent branches.
-     */
+
     protected function read(object $record, string $path): mixed
     {
         $current = $record;

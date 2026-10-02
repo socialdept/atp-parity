@@ -129,14 +129,9 @@ trait AutoSyncsWithReference
     /**
      * Whether this update could have changed either half of the pair.
      *
-     * This hook resyncs the main record and the reference together, so it has to
-     * consider both mappers. A reference record normally holds only a pointer at the
-     * main record, so on its own it changes when the main record moves, and that
-     * happens inside the resync rather than through a column on this row.
+     * Considers both mappers because this hook resyncs them together.
      *
-     * True whenever either mapper's columns are unknowable, for the reason given on
-     * AutoSyncsWithAtp::recordCouldHaveChanged(): a wrong "no" loses an edit, a wrong
-     * "yes" costs a write the CID comparison then suppresses.
+     * @see \SocialDept\AtpParity\Concerns\AutoSyncsWithAtp::recordCouldHaveChanged()
      */
     protected static function pairCouldHaveChanged(Model $model, ReferenceMapper $referenceMapper): bool
     {

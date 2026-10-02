@@ -231,9 +231,8 @@ class ParitySignal extends Signal
 
         // Try to create the record - may fail if data is malformed
         try {
-            // Before hydration, not after: the generated DTO is the current
-            // lexicon, so an older record either fails here or silently loses the
-            // fields the new shape does not declare.
+            // INFO: upcast before hydration. The DTO is the current lexicon, so an
+            // older record would fail here or lose fields it does not declare.
             $record = $recordClass::fromArray(
                 app(UpcasterChain::class)->upcast($commit->collection, (array) $commit->record)
             );

@@ -3,29 +3,19 @@
 namespace SocialDept\AtpParity\Upcasting;
 
 /**
- * One step forward from an older record shape to a newer one.
+ * One step forward from an older record shape to a newer one, inferred from the
+ * record itself because lexicons carry no version.
  *
- * Lexicons are not versioned documents. They evolve by adding, so there is no
- * version on a record to read, and a version we invented would be absent from
- * exactly the records that most need migrating: those written before we added it,
- * and those written by other clients who will never set it.
+ * Two invariants, both of which break silently:
  *
- * So a step infers the shape it applies to from the record itself. That also makes
- * it work on records we did not write, which is the decisive advantage.
- *
- * Two rules, both load-bearing:
- *
- * - `applies()` must be false for a record already in the current shape, or every
- *   read re-dirties the row and the resulting resync loop writes to a PDS.
- * - `apply()` must be safe to run twice. Where a shape difference is ambiguous,
- *   which happens whenever a generation added only an optional field, idempotence
- *   is the only thing that makes the step safe at all.
+ * - `applies()` must be false for a record already current, or every read dirties
+ *   the row and the resulting resync writes to a PDS.
+ * - `apply()` must be safe to run twice, which is the only thing that makes a step
+ *   safe where a shape difference is ambiguous.
  */
 abstract class Upcaster
 {
     /**
-     * Whether this record is in the older shape this step transforms.
-     *
      * @param  array<string, mixed>  $record
      */
     abstract public function applies(array $record): bool;
@@ -37,10 +27,7 @@ abstract class Upcaster
     abstract public function apply(array $record): array;
 
     /**
-     * What the write side should do about the property this step supersedes.
-     *
-     * Declared next to the read side on purpose: deprecating a property has two
-     * halves, and separating them is how one ships without the other.
+     * Declared beside the read side so both halves of a deprecation ship together.
      */
     public function onWrite(): ?Deprecation
     {

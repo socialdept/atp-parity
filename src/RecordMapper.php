@@ -26,8 +26,6 @@ use SocialDept\AtpSchema\Data\Data;
 abstract class RecordMapper implements RecordMapperContract
 {
     /**
-     * Resolved `#[Lexicon]` NSIDs, keyed by mapper class.
-     *
      * @var array<class-string, string|null>
      */
     private static array $lexicons = [];
@@ -74,10 +72,7 @@ abstract class RecordMapper implements RecordMapperContract
         return $this->fieldMap()->toRecordData($model);
     }
 
-    /**
-     * A mapper that declares no fields and overrides neither direction is a
-     * mapper that silently maps nothing, which is worse than a failure.
-     */
+
     private function assertDeclared(string $method): void
     {
         if ($this->fieldMap()->isEmpty()) {
@@ -94,8 +89,8 @@ abstract class RecordMapper implements RecordMapperContract
      */
     public function lexicon(): string
     {
-        // Memoised per class: resolving an attribute means a ReflectionClass, and
-        // this is read on every inbound record.
+        // INFO: memoised. Reading an attribute means a ReflectionClass, and this
+        // runs for every inbound record.
         if (! array_key_exists(static::class, self::$lexicons)) {
             $attributes = (new \ReflectionClass(static::class))->getAttributes(Lexicon::class);
 
@@ -114,12 +109,8 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
-     * The record's fields, keyed by record path.
-     *
-     * Declaring these replaces writing `recordToAttributes()` and
-     * `modelToRecordData()` by hand, and is what makes {@see self::recordColumns()}
-     * answerable. A mapper may still override either direction instead, which is
-     * the right choice where a translation does not fit a declaration.
+     * The record's fields, keyed by record path. A mapper may override either
+     * direction instead.
      *
      * @return array<string, \SocialDept\AtpParity\Fields\Field|string>
      */
@@ -134,11 +125,11 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
-     * The model columns that end up in the record, or null when unknowable.
+     * The model columns that end up in the record, or null when the mapper writes its
+     * own directions.
      *
-     * Null means this mapper writes its own directions, so a caller deciding
-     * whether a save is worth a write must assume it is. Returning an empty array
-     * there would read as "nothing in the record" and suppress every write.
+     * INFO: null rather than empty. Empty would read as "nothing in the record" and
+     * suppress every write.
      *
      * @return array<int, string>|null
      */
@@ -196,9 +187,8 @@ abstract class RecordMapper implements RecordMapperContract
     {
         $recordClass = $this->recordClass();
 
-        // Blobs resolve first, which is the only phase allowed to perform I/O.
-        // Construction after it is pure, so asking what we would write costs
-        // nothing and changes nothing.
+        // INFO: blobs resolve first and are the only phase allowed I/O, so the
+        // construction below stays free of side effects.
         $data = array_replace_recursive(
             $this->modelToRecordData($model),
             $this->resolveBlobs($model),
@@ -210,10 +200,9 @@ abstract class RecordMapper implements RecordMapperContract
     /**
      * Blob references for every blob field this mapper declares.
      *
-     * Where the bytes live is the host app's business, so it supplies a resolver
-     * through `atp-parity.blobs.resolver`. Without one, declared blob fields are
-     * simply absent from the record rather than failing: a mapper may be migrating
-     * to a declaration before the app has wired resolution up.
+     * Without `atp-parity.blobs.resolver` configured, declared blob fields are absent
+     * rather than failing, since a mapper may adopt a declaration before the app
+     * wires resolution up.
      *
      * @return array<string, mixed>
      */
@@ -268,11 +257,8 @@ abstract class RecordMapper implements RecordMapperContract
      * Return false to skip importing this record.
      */
     /**
-     * What this mapper accepts from the network, or null when it has not said.
-     *
-     * Records arrive from the whole network, so a mapper that accepts everything
-     * lets any repo write rows in our database. Declaring nothing therefore means
-     * nothing is accepted: see {@see self::shouldImport()}.
+     * What this mapper accepts from the network, or null when it has not said, in
+     * which case nothing is accepted.
      */
     public function accepts(): ?Acceptance
     {
@@ -280,12 +266,8 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
-     * Refuses by default, because an ingest boundary that forgot its guard should
-     * import nothing rather than everything.
-     *
-     * A mapper that overrides this method replaces this body entirely and keeps
-     * whatever behaviour it had, which is what lets the declaration arrive without
-     * changing any existing mapper.
+     * Refuses by default: an ingest boundary that forgot its guard should import
+     * nothing rather than everything.
      */
     public function shouldImport(Data $record, array $meta = []): bool
     {

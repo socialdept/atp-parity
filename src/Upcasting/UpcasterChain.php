@@ -7,22 +7,16 @@ use ReflectionClass;
 use SocialDept\AtpParity\Attributes\UpcastsFrom;
 
 /**
- * Brings a record of any past shape up to the current one before anything reads it.
+ * Brings a record of any past shape up to the current one, so mappers only ever see
+ * the current shape.
  *
- * Runs on the **raw array, before the DTO is hydrated**, which is the only place it
- * can work: the generated DTO is the current lexicon, so an older record hydrated
- * into it either fails validation or silently loses whatever the new shape does not
- * declare.
- *
- * Mappers therefore only ever see the current shape. The alternative is every mapper
- * carrying a fallback per superseded field, forever, with no point at which any of
- * them can be removed.
+ * INFO: must run on the raw array before the DTO is hydrated. The generated DTO is
+ * the current lexicon, so an older record hydrated into it fails validation or
+ * loses whatever the new shape does not declare.
  */
 class UpcasterChain
 {
     /**
-     * Upcasters by lexicon, in the order they must run.
-     *
      * @var array<string, array<int, Upcaster>>
      */
     protected array $chains = [];
@@ -36,12 +30,8 @@ class UpcasterChain
     }
 
     /**
-     * Bring a record up to the current shape.
-     *
-     * Applies each step whose shape predicate matches, in order. A step that still
-     * matches after running has either mis-declared `applies()` or failed to change
-     * the thing it claims to, and looping on it would be worse than stopping, so it
-     * runs once per pass.
+     * Each step runs at most once per pass, so a step that mis-declares `applies()`
+     * cannot loop.
      *
      * @param  array<string, mixed>  $record
      * @return array<string, mixed>
@@ -58,8 +48,6 @@ class UpcasterChain
     }
 
     /**
-     * Apply the write-side half of every deprecation declared for this lexicon.
-     *
      * @param  array<string, mixed>  $record
      * @return array<string, mixed>
      */
@@ -73,7 +61,7 @@ class UpcasterChain
     }
 
     /**
-     * Which steps a record is behind, for reporting without writing anything.
+     * Which steps a record is behind, without writing anything.
      *
      * @param  array<string, mixed>  $record
      * @return array<int, class-string<Upcaster>>
@@ -131,8 +119,7 @@ class UpcasterChain
     }
 
     /**
-     * An upcaster with no attribute would otherwise register under no lexicon and
-     * never run, so it fails here instead of being quietly inert.
+     * Fails rather than registering under no lexicon and never running.
      */
     protected function attributeOf(Upcaster $upcaster): UpcastsFrom
     {
@@ -146,8 +133,6 @@ class UpcasterChain
     }
 
     /**
-     * Order a lexicon's steps so each runs after the one it names.
-     *
      * @param  array<int, Upcaster>  $instances
      * @return array<int, Upcaster>
      */
