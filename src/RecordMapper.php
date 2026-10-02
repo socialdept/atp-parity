@@ -195,6 +195,10 @@ abstract class RecordMapper implements RecordMapperContract
             $this->resolveBlobs($model),
         );
 
+        // The write half of a deprecation. A mapper only knows the current shape, so
+        // keeping a superseded property populated has to happen here.
+        $data = app(UpcasterChain::class)->applyDeprecations($this->lexicon(), $data);
+
         return $recordClass::fromArray($data);
     }
 
