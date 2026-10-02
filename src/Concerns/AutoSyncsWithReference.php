@@ -65,7 +65,7 @@ trait AutoSyncsWithReference
             if ($model->isFullySynced() && $model->shouldAutoSyncReference()) {
                 $mapper = $model->getReferenceMapper();
 
-                if ($mapper) {
+                if ($mapper && static::pairCouldHaveChanged($model, $mapper)) {
                     try {
                         // Resync BOTH main and reference records
                         $result = app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
@@ -124,6 +124,39 @@ trait AutoSyncsWithReference
                 }
             }
         });
+    }
+
+    /**
+     * Whether this update could have changed either half of the pair.
+     *
+     * This hook resyncs the main record and the reference together, so it has to
+     * consider both mappers. A reference record normally holds only a pointer at the
+     * main record, so on its own it changes when the main record moves, and that
+     * happens inside the resync rather than through a column on this row.
+     *
+     * True whenever either mapper's columns are unknowable, for the reason given on
+     * AutoSyncsWithAtp::recordCouldHaveChanged(): a wrong "no" loses an edit, a wrong
+     * "yes" costs a write the CID comparison then suppresses.
+     */
+    protected static function pairCouldHaveChanged(Model $model, ReferenceMapper $referenceMapper): bool
+    {
+        $columns = [];
+
+        foreach ([$referenceMapper, $referenceMapper->mainMapper()] as $mapper) {
+            if (! $mapper) {
+                continue;
+            }
+
+            $mapperColumns = $mapper->recordColumns();
+
+            if ($mapperColumns === null || $mapperColumns === []) {
+                return true;
+            }
+
+            $columns = [...$columns, ...$mapperColumns];
+        }
+
+        return $columns === [] || $model->wasChanged(array_values(array_unique($columns)));
     }
 
     /**
