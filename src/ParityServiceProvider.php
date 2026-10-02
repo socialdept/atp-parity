@@ -28,6 +28,7 @@ use SocialDept\AtpParity\Storage\FilesystemBlobStorage;
 use SocialDept\AtpParity\Support\RecordHelper;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
 use SocialDept\AtpParity\Sync\SyncService;
+use SocialDept\AtpParity\Upcasting\UpcasterChain;
 
 class ParityServiceProvider extends ServiceProvider
 {
@@ -156,6 +157,10 @@ class ParityServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/atp-parity.php', 'atp-parity');
 
         $this->app->singleton(MapperRegistry::class);
+
+        $this->app->singleton(UpcasterChain::class, function ($app) {
+            return new UpcasterChain(config('atp-parity.upcasters', []));
+        });
         $this->app->alias(MapperRegistry::class, 'parity');
 
         $this->app->singleton(RecordHelper::class, function ($app) {

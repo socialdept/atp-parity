@@ -11,6 +11,7 @@ use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
 use SocialDept\AtpParity\Fields\FieldMap;
+use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -351,7 +352,12 @@ abstract class RecordMapper implements RecordMapperContract
 
             try {
                 $recordClass = $mapper->recordClass();
-                $mapper->upsert($recordClass::fromArray($deferred->record), $deferred->meta());
+                $mapper->upsert(
+                    $recordClass::fromArray(
+                        app(UpcasterChain::class)->upcast($mapper->lexicon(), $deferred->record)
+                    ),
+                    $deferred->meta()
+                );
             } catch (\Throwable $e) {
                 // Leave it parked: a malformed body or a transient failure should
                 // not consume the reference. The TTL sweep is the backstop.

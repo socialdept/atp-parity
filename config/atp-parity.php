@@ -85,6 +85,21 @@ return [
     | missing lookup must not read as "everything is local".
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Upcasters
+    |--------------------------------------------------------------------------
+    |
+    | Steps that bring a record of an older shape up to the current one, applied
+    | to the raw array before the DTO is hydrated. Each declares its lexicon and
+    | its position with #[UpcastsFrom], so listing the class here is the only
+    | thing this file needs to know about it.
+    |
+    */
+    'upcasters' => [
+        //
+    ],
+
     'acceptance' => [
         'local_dids' => null,
     ],
