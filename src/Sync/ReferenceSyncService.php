@@ -167,8 +167,12 @@ class ReferenceSyncService
      *
      * Updates main record first, then reference record.
      * Tracks CID changes to know if records actually changed.
+     *
+     * `$force` writes both even when the repo already holds them, and must be
+     * threaded to both halves: this is the entry point a repair tool reaches for,
+     * so a force that stopped here would leave the pair unrepairable.
      */
-    public function resyncWithReference(Model $model, ReferenceMapper $referenceMapper): ReferenceSyncResult
+    public function resyncWithReference(Model $model, ReferenceMapper $referenceMapper, bool $force = false): ReferenceSyncResult
     {
         $mainMapper = $referenceMapper->mainMapper();
 
@@ -183,14 +187,14 @@ class ReferenceSyncService
         $oldReferenceCid = $model->{$referenceMapper->referenceCidColumn()};
 
         // Step 1: Resync main record
-        $mainResult = $this->syncService->resyncWithMapper($model, $mainMapper);
+        $mainResult = $this->syncService->resyncWithMapper($model, $mainMapper, $force);
 
         if ($mainResult->isFailed()) {
             return ReferenceSyncResult::failed($mainResult->error);
         }
 
         // Step 2: Resync reference record
-        $referenceResult = $this->resyncReference($model, $referenceMapper);
+        $referenceResult = $this->resyncReference($model, $referenceMapper, $force);
 
         if ($referenceResult->isFailed()) {
             // Main succeeded but reference failed: keep the (stale) reference uri
