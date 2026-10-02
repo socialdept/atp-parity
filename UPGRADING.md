@@ -72,7 +72,23 @@ nothing.
 `recordColumns()` and `accepts()`. **Extending `RecordMapper` gives you all three.**
 Only a class implementing the interface directly needs to add them.
 
-### 4. The two direction methods are no longer abstract
+### 4. Protocol metadata no longer goes through `fill()`
+
+`atp_uri`, `atp_cid` and the synced-at column are now written with `setAttribute()`
+rather than filled. They are the package's own bookkeeping, not data from the record,
+and a model with a real `$fillable` silently dropped them. A missing uri makes
+`findByUri()` miss, so the next event for the same record inserts a duplicate row. A
+missing cid disables the unchanged-record write guard.
+
+Record fields still go through `fill()`, which is deliberate: a record arrives from
+any repo on the network, so it must not be able to write a column you did not open up.
+
+**If you override `applyMeta()`**, it is now only for attributes your mapper derives
+from the event meta, and those are still filled. The metadata columns moved to
+`applyMetaColumns()`. Calling `parent::applyMeta()` is still correct and now returns
+the attributes unchanged.
+
+### 5. The two direction methods are no longer abstract
 
 `recordToAttributes()` and `modelToRecordData()` have defaults that read your
 `fields()` declaration. A mapper that declares neither a field map nor an override

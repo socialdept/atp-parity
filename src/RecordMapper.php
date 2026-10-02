@@ -177,10 +177,11 @@ abstract class RecordMapper implements RecordMapperContract
     public function toModel(Data $record, array $meta = []): Model
     {
         $modelClass = $this->modelClass();
-        $attributes = $this->recordToAttributes($record);
-        $attributes = $this->applyMeta($attributes, $meta);
+        $model = new $modelClass($this->applyMeta($this->recordToAttributes($record), $meta));
 
-        return new $modelClass($attributes);
+        $this->applyMetaColumns($model, $meta);
+
+        return $model;
     }
 
     public function toRecord(Model $model): Data
@@ -236,9 +237,9 @@ abstract class RecordMapper implements RecordMapperContract
 
     public function updateModel(Model $model, Data $record, array $meta = []): Model
     {
-        $attributes = $this->recordToAttributes($record);
-        $attributes = $this->applyMeta($attributes, $meta);
-        $model->fill($attributes);
+        $model->fill($this->applyMeta($this->recordToAttributes($record), $meta));
+
+        $this->applyMetaColumns($model, $meta);
 
         return $model;
     }
@@ -416,26 +417,46 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
-     * Apply AT Protocol metadata to attributes.
+     * Attributes a mapper derives from the event meta rather than the record body.
+     *
+     * These are filled, so they respect the model's mass-assignment rules like any
+     * other attribute built from an untrusted record.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
      */
     protected function applyMeta(array $attributes, array $meta): array
     {
+        return $attributes;
+    }
+
+    /**
+     * Write the protocol metadata columns onto the model.
+     *
+     * FIX: deliberately not filled. These columns are the package's own bookkeeping,
+     * not data from the record, so a model with a real `$fillable` would silently
+     * drop them: a missing uri makes `findByUri()` miss and the next event insert a
+     * duplicate row, and a missing cid disables the unchanged-record write guard.
+     * The outbound path has always written them directly.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function applyMetaColumns(Model $model, array $meta): void
+    {
         if (isset($meta['uri'])) {
-            $attributes[$this->uriColumn()] = $meta['uri'];
+            $model->setAttribute($this->uriColumn(), $meta['uri']);
         }
 
         if (isset($meta['cid'])) {
-            $attributes[$this->cidColumn()] = $meta['cid'];
+            $model->setAttribute($this->cidColumn(), $meta['cid']);
         }
 
         if (isset($meta['rkey']) && ($rkeyColumn = $this->rkeyColumn())) {
-            $attributes[$rkeyColumn] = $meta['rkey'];
+            $model->setAttribute($rkeyColumn, $meta['rkey']);
         }
 
-        // Always set synced_at when applying meta
-        $attributes[$this->syncedAtColumn()] = now();
-
-        return $attributes;
+        $model->setAttribute($this->syncedAtColumn(), now());
     }
 
     /**
