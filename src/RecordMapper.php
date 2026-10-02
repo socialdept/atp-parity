@@ -4,10 +4,12 @@ namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use SocialDept\AtpParity\Attributes\Lexicon;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
+use SocialDept\AtpParity\Fields\FieldMap;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -21,6 +23,15 @@ use SocialDept\AtpSchema\Data\Data;
  */
 abstract class RecordMapper implements RecordMapperContract
 {
+    /**
+     * Resolved `#[Lexicon]` NSIDs, keyed by mapper class.
+     *
+     * @var array<class-string, string|null>
+     */
+    private static array $lexicons = [];
+
+    private ?FieldMap $fieldMap = null;
+
     /**
      * Get the Record class this mapper handles.
      *
@@ -41,7 +52,12 @@ abstract class RecordMapper implements RecordMapperContract
      * @param  TRecord  $record
      * @return array<string, mixed>
      */
-    abstract protected function recordToAttributes(Data $record): array;
+    protected function recordToAttributes(Data $record): array
+    {
+        $this->assertDeclared(__FUNCTION__);
+
+        return $this->fieldMap()->toAttributes($record);
+    }
 
     /**
      * Map model attributes to record properties.
@@ -49,16 +65,84 @@ abstract class RecordMapper implements RecordMapperContract
      * @param  TModel  $model
      * @return array<string, mixed>
      */
-    abstract protected function modelToRecordData(Model $model): array;
+    protected function modelToRecordData(Model $model): array
+    {
+        $this->assertDeclared(__FUNCTION__);
+
+        return $this->fieldMap()->toRecordData($model);
+    }
+
+    /**
+     * A mapper that declares no fields and overrides neither direction is a
+     * mapper that silently maps nothing, which is worse than a failure.
+     */
+    private function assertDeclared(string $method): void
+    {
+        if ($this->fieldMap()->isEmpty()) {
+            throw new \LogicException(sprintf(
+                '%s declares no fields() and does not override %s(). One or the other is required.',
+                static::class,
+                $method,
+            ));
+        }
+    }
 
     /**
      * Get the lexicon NSID this mapper handles.
      */
     public function lexicon(): string
     {
+        // Memoised per class: resolving an attribute means a ReflectionClass, and
+        // this is read on every inbound record.
+        if (! array_key_exists(static::class, self::$lexicons)) {
+            $attributes = (new \ReflectionClass(static::class))->getAttributes(Lexicon::class);
+
+            self::$lexicons[static::class] = $attributes === []
+                ? null
+                : $attributes[0]->newInstance()->nsid;
+        }
+
+        if (self::$lexicons[static::class] !== null) {
+            return self::$lexicons[static::class];
+        }
+
         $recordClass = $this->recordClass();
 
         return $recordClass::getLexicon();
+    }
+
+    /**
+     * The record's fields, keyed by record path.
+     *
+     * Declaring these replaces writing `recordToAttributes()` and
+     * `modelToRecordData()` by hand, and is what makes {@see self::recordColumns()}
+     * answerable. A mapper may still override either direction instead, which is
+     * the right choice where a translation does not fit a declaration.
+     *
+     * @return array<string, \SocialDept\AtpParity\Fields\Field|string>
+     */
+    public function fields(): array
+    {
+        return [];
+    }
+
+    public function fieldMap(): FieldMap
+    {
+        return $this->fieldMap ??= new FieldMap($this->fields());
+    }
+
+    /**
+     * The model columns that end up in the record, or null when unknowable.
+     *
+     * Null means this mapper writes its own directions, so a caller deciding
+     * whether a save is worth a write must assume it is. Returning an empty array
+     * there would read as "nothing in the record" and suppress every write.
+     *
+     * @return array<int, string>|null
+     */
+    public function recordColumns(): ?array
+    {
+        return $this->fieldMap()->isEmpty() ? null : $this->fieldMap()->columns();
     }
 
     /**

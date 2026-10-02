@@ -34,6 +34,24 @@ interface RecordMapper
     public function lexicon(): string;
 
     /**
+     * The record's fields keyed by record path, or an empty array when the mapper
+     * writes its own directions.
+     *
+     * @return array<string, \SocialDept\AtpParity\Fields\Field|string>
+     */
+    public function fields(): array;
+
+    /**
+     * The model columns that end up in the record, or null when unknowable.
+     *
+     * Null means the mapper writes its own directions, so a caller deciding
+     * whether a save is worth a write must assume it is.
+     *
+     * @return array<int, string>|null
+     */
+    public function recordColumns(): ?array;
+
+    /**
      * Convert a Record DTO to an Eloquent Model.
      *
      * @param  TRecord  $record
