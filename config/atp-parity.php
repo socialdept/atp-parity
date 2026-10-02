@@ -64,6 +64,46 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Acceptance
+    |--------------------------------------------------------------------------
+    |
+    | Every mapper is an ingest boundary: records arrive from the whole network,
+    | so a mapper declares what it accepts and refuses everything when it has
+    | not said. See SocialDept\AtpParity\Acceptance\Acceptance.
+    |
+    | Two different questions, each a callable or invokable class name taking a DID
+    | and returning a bool. Neither falls back to the other, and an unconfigured
+    | lookup accepts nothing, because absent must not read as "yes".
+    |
+    | `is_connected_actor`  have they connected their account, so we hold credentials
+    |                       and an inbound record in that repo may be our own write
+    | `is_known_actor`      do we know this actor at all, whether or not we can write
+    |                       for them. One identified by a signed JWT through an XRPC
+    |                       proxy is known and has no tokens here yet
+    |
+    */
+    'acceptance' => [
+        'is_connected_actor' => null,
+        'is_known_actor' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Upcasters
+    |--------------------------------------------------------------------------
+    |
+    | Steps that bring a record of an older shape up to the current one, applied
+    | to the raw array before the DTO is hydrated. Each declares its lexicon and
+    | its position with #[UpcastsFrom], so listing the class here is the only
+    | thing this file needs to know about it.
+    |
+    */
+    'upcasters' => [
+        //
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sync Configuration
     |--------------------------------------------------------------------------
     |
@@ -261,6 +301,13 @@ return [
     |
     */
     'blobs' => [
+        // Turns a model's attached file into a blob reference, and is the only
+        // part of writing a record allowed to perform I/O. It runs before the
+        // record is constructed so construction stays pure, which is what makes
+        // "what would we write" cheap enough to ask before every write.
+        // An invokable implementing Contracts\BlobResolver, or null.
+        'resolver' => null,
+
         // Storage driver: 'filesystem' or 'medialibrary'
         // - filesystem: Uses Laravel filesystem + parity_blob_mappings table
         // - medialibrary: Uses Spatie MediaLibrary (no extra migrations needed)

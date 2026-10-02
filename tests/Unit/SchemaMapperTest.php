@@ -2,6 +2,7 @@
 
 namespace SocialDept\AtpParity\Tests\Unit;
 
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\Support\SchemaMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestModel;
 use SocialDept\AtpParity\Tests\Fixtures\TestRecord;
@@ -123,6 +124,7 @@ class SchemaMapperTest extends TestCase
             modelClass: TestModel::class,
             toAttributes: fn (TestRecord $r) => ['content' => $r->text],
             toRecordData: fn (TestModel $m) => ['text' => $m->content],
+            accepts: Acceptance::anything(),
         );
 
         $record = new TestRecord(text: 'schema mapper test');

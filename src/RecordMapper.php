@@ -4,10 +4,14 @@ namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use SocialDept\AtpParity\Acceptance\Acceptance;
+use SocialDept\AtpParity\Attributes\Lexicon;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
+use SocialDept\AtpParity\Fields\FieldMap;
+use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -21,6 +25,13 @@ use SocialDept\AtpSchema\Data\Data;
  */
 abstract class RecordMapper implements RecordMapperContract
 {
+    /**
+     * @var array<class-string, string|null>
+     */
+    private static array $lexicons = [];
+
+    private ?FieldMap $fieldMap = null;
+
     /**
      * Get the Record class this mapper handles.
      *
@@ -41,7 +52,12 @@ abstract class RecordMapper implements RecordMapperContract
      * @param  TRecord  $record
      * @return array<string, mixed>
      */
-    abstract protected function recordToAttributes(Data $record): array;
+    protected function recordToAttributes(Data $record): array
+    {
+        $this->assertDeclared(__FUNCTION__);
+
+        return $this->fieldMap()->toAttributes($record);
+    }
 
     /**
      * Map model attributes to record properties.
@@ -49,16 +65,77 @@ abstract class RecordMapper implements RecordMapperContract
      * @param  TModel  $model
      * @return array<string, mixed>
      */
-    abstract protected function modelToRecordData(Model $model): array;
+    protected function modelToRecordData(Model $model): array
+    {
+        $this->assertDeclared(__FUNCTION__);
+
+        return $this->fieldMap()->toRecordData($model);
+    }
+
+
+    private function assertDeclared(string $method): void
+    {
+        if ($this->fieldMap()->isEmpty()) {
+            throw new \LogicException(sprintf(
+                '%s declares no fields() and does not override %s(). One or the other is required.',
+                static::class,
+                $method,
+            ));
+        }
+    }
 
     /**
      * Get the lexicon NSID this mapper handles.
      */
     public function lexicon(): string
     {
+        // INFO: memoised. Reading an attribute means a ReflectionClass, and this
+        // runs for every inbound record.
+        if (! array_key_exists(static::class, self::$lexicons)) {
+            $attributes = (new \ReflectionClass(static::class))->getAttributes(Lexicon::class);
+
+            self::$lexicons[static::class] = $attributes === []
+                ? null
+                : $attributes[0]->newInstance()->nsid;
+        }
+
+        if (self::$lexicons[static::class] !== null) {
+            return self::$lexicons[static::class];
+        }
+
         $recordClass = $this->recordClass();
 
         return $recordClass::getLexicon();
+    }
+
+    /**
+     * The record's fields, keyed by record path. A mapper may override either
+     * direction instead.
+     *
+     * @return array<string, \SocialDept\AtpParity\Fields\Field|string>
+     */
+    public function fields(): array
+    {
+        return [];
+    }
+
+    public function fieldMap(): FieldMap
+    {
+        return $this->fieldMap ??= new FieldMap($this->fields());
+    }
+
+    /**
+     * The model columns that end up in the record, or null when the mapper writes its
+     * own directions.
+     *
+     * INFO: null rather than empty. Empty would read as "nothing in the record" and
+     * suppress every write.
+     *
+     * @return array<int, string>|null
+     */
+    public function recordColumns(): ?array
+    {
+        return $this->fieldMap()->isEmpty() ? null : $this->fieldMap()->columns();
     }
 
     /**
@@ -100,24 +177,73 @@ abstract class RecordMapper implements RecordMapperContract
     public function toModel(Data $record, array $meta = []): Model
     {
         $modelClass = $this->modelClass();
-        $attributes = $this->recordToAttributes($record);
-        $attributes = $this->applyMeta($attributes, $meta);
+        $model = new $modelClass($this->applyMeta($this->recordToAttributes($record), $meta));
 
-        return new $modelClass($attributes);
+        $this->applyMetaColumns($model, $meta);
+
+        return $model;
     }
 
     public function toRecord(Model $model): Data
     {
         $recordClass = $this->recordClass();
 
-        return $recordClass::fromArray($this->modelToRecordData($model));
+        // INFO: blobs resolve first and are the only phase allowed I/O, so the
+        // construction below stays free of side effects.
+        $data = array_replace_recursive(
+            $this->modelToRecordData($model),
+            $this->resolveBlobs($model),
+        );
+
+        // The write half of a deprecation. A mapper only knows the current shape, so
+        // keeping a superseded property populated has to happen here.
+        $data = app(UpcasterChain::class)->applyDeprecations($this->lexicon(), $data);
+
+        return $recordClass::fromArray($data);
+    }
+
+    /**
+     * Blob references for every blob field this mapper declares.
+     *
+     * Without `atp-parity.blobs.resolver` configured, declared blob fields are absent
+     * rather than failing, since a mapper may adopt a declaration before the app
+     * wires resolution up.
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolveBlobs(Model $model): array
+    {
+        $paths = $this->fieldMap()->blobPaths();
+
+        if ($paths === []) {
+            return [];
+        }
+
+        $resolver = config('atp-parity.blobs.resolver');
+
+        if ($resolver === null) {
+            return [];
+        }
+
+        $resolver = is_string($resolver) ? app($resolver) : $resolver;
+        $resolved = [];
+
+        foreach ($paths as $path) {
+            $reference = $resolver->resolve($model, $path);
+
+            if ($reference !== null) {
+                $resolved[$path] = $reference;
+            }
+        }
+
+        return $resolved;
     }
 
     public function updateModel(Model $model, Data $record, array $meta = []): Model
     {
-        $attributes = $this->recordToAttributes($record);
-        $attributes = $this->applyMeta($attributes, $meta);
-        $model->fill($attributes);
+        $model->fill($this->applyMeta($this->recordToAttributes($record), $meta));
+
+        $this->applyMetaColumns($model, $meta);
 
         return $model;
     }
@@ -135,9 +261,22 @@ abstract class RecordMapper implements RecordMapperContract
      * Override this method to add custom import conditions.
      * Return false to skip importing this record.
      */
+    /**
+     * What this mapper accepts from the network, or null when it has not said, in
+     * which case nothing is accepted.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return null;
+    }
+
+    /**
+     * Refuses by default: an ingest boundary that forgot its guard should import
+     * nothing rather than everything.
+     */
     public function shouldImport(Data $record, array $meta = []): bool
     {
-        return true;
+        return $this->accepts()?->permits($record, $meta, $this) ?? false;
     }
 
     /**
@@ -246,7 +385,12 @@ abstract class RecordMapper implements RecordMapperContract
 
             try {
                 $recordClass = $mapper->recordClass();
-                $mapper->upsert($recordClass::fromArray($deferred->record), $deferred->meta());
+                $mapper->upsert(
+                    $recordClass::fromArray(
+                        app(UpcasterChain::class)->upcast($mapper->lexicon(), $deferred->record)
+                    ),
+                    $deferred->meta()
+                );
             } catch (\Throwable $e) {
                 // Leave it parked: a malformed body or a transient failure should
                 // not consume the reference. The TTL sweep is the backstop.
@@ -277,26 +421,46 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
-     * Apply AT Protocol metadata to attributes.
+     * Attributes a mapper derives from the event meta rather than the record body.
+     *
+     * These are filled, so they respect the model's mass-assignment rules like any
+     * other attribute built from an untrusted record.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
      */
     protected function applyMeta(array $attributes, array $meta): array
     {
+        return $attributes;
+    }
+
+    /**
+     * Write the protocol metadata columns onto the model.
+     *
+     * FIX: deliberately not filled. These columns are the package's own bookkeeping,
+     * not data from the record, so a model with a real `$fillable` would silently
+     * drop them: a missing uri makes `findByUri()` miss and the next event insert a
+     * duplicate row, and a missing cid disables the unchanged-record write guard.
+     * The outbound path has always written them directly.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function applyMetaColumns(Model $model, array $meta): void
+    {
         if (isset($meta['uri'])) {
-            $attributes[$this->uriColumn()] = $meta['uri'];
+            $model->setAttribute($this->uriColumn(), $meta['uri']);
         }
 
         if (isset($meta['cid'])) {
-            $attributes[$this->cidColumn()] = $meta['cid'];
+            $model->setAttribute($this->cidColumn(), $meta['cid']);
         }
 
         if (isset($meta['rkey']) && ($rkeyColumn = $this->rkeyColumn())) {
-            $attributes[$rkeyColumn] = $meta['rkey'];
+            $model->setAttribute($rkeyColumn, $meta['rkey']);
         }
 
-        // Always set synced_at when applying meta
-        $attributes[$this->syncedAtColumn()] = now();
-
-        return $attributes;
+        $model->setAttribute($this->syncedAtColumn(), now());
     }
 
     /**

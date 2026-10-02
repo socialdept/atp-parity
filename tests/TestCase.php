@@ -47,6 +47,7 @@ abstract class TestCase extends Orchestra
         Schema::create('test_models', function (Blueprint $table) {
             $table->id();
             $table->string('content')->nullable();
+            $table->string('local_only')->nullable();
             $table->string('did')->nullable();
             $table->string('atp_uri')->nullable()->unique();
             $table->string('atp_cid')->nullable();

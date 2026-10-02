@@ -3,6 +3,7 @@
 namespace SocialDept\AtpParity\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\RecordMapper;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -41,5 +42,14 @@ class MediaMapper extends RecordMapper
             'icon' => ['type' => 'single'],
             'images' => ['type' => 'array'],
         ];
+    }
+
+    /**
+     * A test double standing in for an arbitrary collection, so it accepts freely.
+     * A real mapper states a narrower policy.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return Acceptance::anything();
     }
 }

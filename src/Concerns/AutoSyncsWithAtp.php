@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpClient\Exceptions\AuthenticationException;
 use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
 use SocialDept\AtpParity\Enums\PendingSyncOperation;
+use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
 use SocialDept\AtpParity\Sync\SyncService;
 
@@ -46,7 +47,7 @@ trait AutoSyncsWithAtp
         });
 
         static::updated(function ($model) {
-            if ($model->isSynced() && $model->shouldAutoSync()) {
+            if ($model->isSynced() && $model->shouldAutoSync() && static::recordCouldHaveChanged($model)) {
                 try {
                     app(SyncService::class)->resync($model);
                 } catch (OAuthSessionInvalidException|AuthenticationException $e) {
@@ -76,6 +77,32 @@ trait AutoSyncsWithAtp
                 }
             }
         });
+    }
+
+    /**
+     * Whether this update could have changed anything the record contains.
+     *
+     * INFO: true whenever the question cannot be settled. A wrong "no" is an edit
+     * that never reaches the PDS, a wrong "yes" is a redundant write the CID
+     * comparison in SyncService catches.
+     */
+    protected static function recordCouldHaveChanged(Model $model): bool
+    {
+        $mapper = app(MapperRegistry::class)->forModel(get_class($model));
+
+        if (! $mapper) {
+            return true;
+        }
+
+        $columns = $mapper->recordColumns();
+
+        // Null: directions written by hand, columns unknowable. Empty: all fields
+        // derived, so gating on columns would block every write.
+        if ($columns === null || $columns === []) {
+            return true;
+        }
+
+        return $model->wasChanged($columns);
     }
 
     /**

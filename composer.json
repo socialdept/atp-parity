@@ -45,5 +45,8 @@
                 "Parity": "SocialDept\\AtpParity\\Facades\\Parity"
             }
         }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
     }
 }
