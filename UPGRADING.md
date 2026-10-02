@@ -92,16 +92,15 @@ public function fields(): array
         'name' => 'name',
         'preferences.timezone' => Field::for('timezone')->default('UTC'),
         'theme' => Field::for('palette')->codec(ThemeCodec::class)->lossy(),
-        'url'  => Field::set(fn ($model) => $model->url()),   // written, never imported
+        'url'  => Field::derived(fn ($model) => $model->url()),   // no column, write only
         'icon' => Field::for('icon')->blob(),
     ];
 }
 ```
 
-`Field` mirrors Eloquent's `Attribute`: `make(get:, set:)`, `get()`, `set()`. Those
-are **constructors and do not chain**. PHP cannot give a class both a static `get()`
-and an instance `get()`, and calling a static through `->` silently builds a fresh
-object. Use `using(get:, set:)` to add closures to a field that already has a column.
+A field is built with `Field::for($column)`, or `Field::derived($closure)` for one
+with no column that is only ever written. Everything else chains, including `get()`
+and `set()` for either direction.
 
 What the declaration buys, beyond writing each default once:
 
