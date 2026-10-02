@@ -479,6 +479,52 @@ class ReferenceSyncServiceTest extends TestCase
         $this->assertTrue($this->service->resyncReference($model, $this->referenceMapper)->unchanged);
     }
 
+    /**
+     * `resyncWithReference()` is what a repair tool calls, so a force that reached
+     * only `resyncReference()` would leave the pair unrepairable. Both halves must
+     * write: two putRecord calls, not zero and not one.
+     */
+    public function test_force_on_the_combined_resync_writes_both_records(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Unchanged',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        // Both records already match what we would write, so nothing is due.
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toArray());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(2, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiForced');
+
+        $this->service->resyncWithReference($model, $this->referenceMapper, force: true);
+    }
+
+    /**
+     * The same pair without force must not write at all, which is what makes the
+     * test above meaningful rather than tautological.
+     */
+    public function test_the_combined_resync_writes_neither_record_when_both_are_unchanged(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Unchanged',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toArray());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');
+
+        $this->service->resyncWithReference($model, $this->referenceMapper);
+    }
+
     public function test_resync_reference_fails_when_not_synced(): void
     {
         $model = ReferenceModel::create([
