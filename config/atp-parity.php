@@ -71,14 +71,20 @@ return [
     | so a mapper declares what it accepts and refuses everything when it has
     | not said. See SocialDept\AtpParity\Acceptance\Acceptance.
     |
-    | `local_dids` answers "is this repo one of ours", which only the host app
-    | knows. An invokable class name or a callable taking a DID and returning a
-    | bool. Absent, the policies that depend on it accept nothing, because a
-    | missing lookup must not read as "everything is local".
+    | Two different questions, each a callable or invokable class name taking a DID
+    | and returning a bool. Neither falls back to the other, and an unconfigured
+    | lookup accepts nothing, because absent must not read as "yes".
+    |
+    | `writes_to_repo`  do we hold credentials for this repo, so an inbound record
+    |                   there may be our own write coming back
+    | `knows_actor`     do we know this actor at all, whether or not we can write
+    |                   for them. An actor identified by a signed JWT through an
+    |                   XRPC proxy is one we know and hold no tokens for
     |
     */
     'acceptance' => [
-        'local_dids' => null,
+        'writes_to_repo' => null,
+        'knows_actor' => null,
     ],
 
     /*

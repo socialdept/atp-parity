@@ -473,10 +473,14 @@ return [
         'cid' => 'atp_cid',
     ],
 
-    // Answers "is this repo one of ours", which only your app knows. Required by
-    // Acceptance::ownWritesOnly() and localDids(); without it they accept nothing.
+    // Two different questions, neither falling back to the other. Without a lookup
+    // the policy that needs it accepts nothing.
     'acceptance' => [
-        'local_dids' => fn (string $did) => \App\Models\User::where('did', $did)->exists(),
+        // Do we hold credentials for this repo, so an inbound record may be our own?
+        'writes_to_repo' => fn (string $did) => \App\Models\LoginMethod::validFor($did)->exists(),
+
+        // Do we know this actor at all, whether or not we can write for them?
+        'knows_actor' => fn (string $did) => \App\Models\User::where('did', $did)->exists(),
     ],
 
     // Steps that bring older record shapes up to the current one. Each declares its

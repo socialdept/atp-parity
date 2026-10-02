@@ -39,9 +39,15 @@ class FieldMap
         foreach ($this->fields as $field) {
             $field = $this->normalise($field);
 
-            if ($field->isWritten() && $field->column !== null) {
+            if (! $field->isWritten()) {
+                continue;
+            }
+
+            if ($field->column !== null) {
                 $columns[] = $field->column;
             }
+
+            $columns = [...$columns, ...$field->reads];
         }
 
         return array_values(array_unique($columns));

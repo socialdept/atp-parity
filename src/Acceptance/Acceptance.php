@@ -45,29 +45,29 @@ class Acceptance
     }
 
     /**
-     * Accept only records in a repo we write to.
+     * Accept only records in a repo we hold credentials for, where an inbound record
+     * may be our own write coming back.
      *
-     * Needs `atp-parity.acceptance.local_dids`. Without it nothing is accepted, so
-     * a missing lookup cannot read as "everything is local".
+     * Needs `atp-parity.acceptance.writes_to_repo`.
      */
     public static function ownWritesOnly(): static
     {
-        return static::when(function (Data $record, array $meta): bool {
-            $did = $meta['did'] ?? null;
-
-            return is_string($did) && $did !== '' && static::didIsLocal($did);
-        });
+        return static::forRepo('writes_to_repo');
     }
 
     /**
-     * Accept records whose repo belongs to a user we know about.
+     * Accept records from any actor we know, whether or not we can write for them.
      *
-     * The same lookup as {@see self::ownWritesOnly()} today, kept separate because a
-     * repo we can write to is not the same as one we have heard of.
+     * Strictly broader than {@see self::ownWritesOnly()}, and a different question: an
+     * actor identified by a signed JWT through an XRPC proxy is one we know and hold
+     * no tokens for, so their content can be accepted and held until they sign in.
+     *
+     * Needs `atp-parity.acceptance.knows_actor`. Deliberately not falling back to the
+     * write lookup, which would turn "we can write here" into "we have heard of them".
      */
-    public static function localDids(): static
+    public static function knownActors(): static
     {
-        return static::ownWritesOnly();
+        return static::forRepo('knows_actor');
     }
 
     public function and(self $other): static
@@ -100,18 +100,28 @@ class Acceptance
         return ($this->permits)($record, $meta, $mapper);
     }
 
-    protected static function didIsLocal(string $did): bool
+    /**
+     * A policy backed by one of the configured repo lookups.
+     *
+     * An unconfigured lookup accepts nothing, which is the safe direction: absent must
+     * not read as "yes".
+     */
+    protected static function forRepo(string $lookup): static
     {
-        $resolver = config('atp-parity.acceptance.local_dids');
+        return static::when(function (Data $record, array $meta) use ($lookup): bool {
+            $did = $meta['did'] ?? null;
 
-        if ($resolver === null) {
-            return false;
-        }
+            if (! is_string($did) || $did === '') {
+                return false;
+            }
 
-        if (is_string($resolver)) {
-            $resolver = app($resolver);
-        }
+            $resolver = config('atp-parity.acceptance.'.$lookup);
 
-        return (bool) $resolver($did);
+            if ($resolver === null) {
+                return false;
+            }
+
+            return (bool) (is_string($resolver) ? app($resolver) : $resolver)($did);
+        });
     }
 }

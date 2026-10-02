@@ -69,35 +69,66 @@ class AcceptanceTest extends TestCase
     }
 
     /**
-     * Whether a DID is ours is the host app's knowledge, so the policy delegates. An
-     * unconfigured lookup must not read as "everything is local".
+     * Whether a repo is ours is the host app's knowledge, so the policy delegates. An
+     * unconfigured lookup must not read as "yes".
      */
-    public function test_own_writes_only_accepts_nothing_without_a_configured_lookup(): void
+    public function test_a_policy_accepts_nothing_without_its_configured_lookup(): void
     {
-        config(['atp-parity.acceptance.local_dids' => null]);
+        config(['atp-parity.acceptance.writes_to_repo' => null, 'atp-parity.acceptance.knows_actor' => null]);
 
+        $record = new TestRecord(text: 'x');
+        $meta = ['did' => 'did:plc:ours'];
+
+        $this->assertFalse($this->mapper(Acceptance::ownWritesOnly())->shouldImport($record, $meta));
+        $this->assertFalse($this->mapper(Acceptance::knownActors())->shouldImport($record, $meta));
+    }
+
+    public function test_each_policy_consults_its_own_lookup(): void
+    {
+        config([
+            'atp-parity.acceptance.writes_to_repo' => fn (string $did) => $did === 'did:plc:tokens',
+            'atp-parity.acceptance.knows_actor' => fn (string $did) => in_array($did, ['did:plc:tokens', 'did:plc:known'], true),
+        ]);
+
+        $record = new TestRecord(text: 'x');
+        $writes = $this->mapper(Acceptance::ownWritesOnly());
+        $knows = $this->mapper(Acceptance::knownActors());
+
+        $this->assertTrue($writes->shouldImport($record, ['did' => 'did:plc:tokens']));
+        $this->assertTrue($knows->shouldImport($record, ['did' => 'did:plc:tokens']));
+
+        $this->assertTrue($knows->shouldImport($record, ['did' => 'did:plc:known']));
         $this->assertFalse(
-            $this->mapper(Acceptance::ownWritesOnly())->shouldImport(new TestRecord(text: 'x'), ['did' => 'did:plc:ours']),
+            $writes->shouldImport($record, ['did' => 'did:plc:known']),
+            'An actor we know but hold no tokens for is not a repo we write to.',
         );
     }
 
-    public function test_own_writes_only_consults_the_configured_lookup(): void
+    /**
+     * The reason these are two keys. An actor identified by a signed JWT through an
+     * XRPC proxy is one we know and cannot write for, so borrowing the write lookup
+     * would turn "we can write here" into "we have heard of them".
+     */
+    public function test_neither_policy_falls_back_to_the_other_lookup(): void
     {
-        config(['atp-parity.acceptance.local_dids' => fn (string $did) => $did === 'did:plc:ours']);
+        $record = new TestRecord(text: 'x');
+        $meta = ['did' => 'did:plc:ours'];
 
-        $mapper = $this->mapper(Acceptance::ownWritesOnly());
+        config(['atp-parity.acceptance.writes_to_repo' => fn () => true, 'atp-parity.acceptance.knows_actor' => null]);
+        $this->assertFalse($this->mapper(Acceptance::knownActors())->shouldImport($record, $meta));
 
-        $this->assertTrue($mapper->shouldImport(new TestRecord(text: 'x'), ['did' => 'did:plc:ours']));
-        $this->assertFalse($mapper->shouldImport(new TestRecord(text: 'x'), ['did' => 'did:plc:theirs']));
+        config(['atp-parity.acceptance.writes_to_repo' => null, 'atp-parity.acceptance.knows_actor' => fn () => true]);
+        $this->assertFalse($this->mapper(Acceptance::ownWritesOnly())->shouldImport($record, $meta));
     }
 
-    public function test_own_writes_only_refuses_a_record_with_no_repo(): void
+    public function test_a_record_with_no_repo_is_refused_by_both(): void
     {
-        config(['atp-parity.acceptance.local_dids' => fn () => true]);
+        config(['atp-parity.acceptance.writes_to_repo' => fn () => true, 'atp-parity.acceptance.knows_actor' => fn () => true]);
 
-        $this->assertFalse(
-            $this->mapper(Acceptance::ownWritesOnly())->shouldImport(new TestRecord(text: 'x'), []),
-        );
+        $record = new TestRecord(text: 'x');
+
+        $this->assertFalse($this->mapper(Acceptance::ownWritesOnly())->shouldImport($record, []));
+        $this->assertFalse($this->mapper(Acceptance::knownActors())->shouldImport($record, []));
     }
 
     /**

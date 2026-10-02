@@ -35,21 +35,27 @@ public function accepts(): ?Acceptance
 ```
 
 Available: `anything()`, `none()`, `when(callable)`, `ownWritesOnly()`,
-`localDids()`, and `->and()` / `->or()` to compose. `anything()` is legitimate for a
-genuinely public collection and is deliberately verbose so it reads as a decision.
+`knownActors()`, and `->and()` / `->or()` to compose. `anything()` is legitimate for
+a genuinely public collection and is deliberately verbose so it reads as a decision.
 
-`ownWritesOnly()` and `localDids()` ask whether a DID is one of yours, which only
-your app knows, so configure the lookup:
+Two of those ask questions only your app can answer, and they are different questions,
+so they read different lookups and neither falls back to the other:
 
 ```php
 // config/atp-parity.php
 'acceptance' => [
-    'local_dids' => fn (string $did) => User::where('did', $did)->exists(),
+    // Do we hold credentials for this repo, so an inbound record may be our own write?
+    'writes_to_repo' => fn (string $did) => LoginMethod::validFor($did)->exists(),
+
+    // Do we know this actor at all, whether or not we can write for them? One
+    // identified by a signed JWT through an XRPC proxy has no tokens here yet.
+    'knows_actor' => fn (string $did) => User::where('did', $did)->exists(),
 ],
 ```
 
-Without it those policies accept nothing. A missing lookup must not read as
-"everything is local".
+Without a lookup the policy that needs it accepts nothing. Absent must not read as
+"yes", and borrowing the other would turn "we can write here" into "we have heard of
+them".
 
 ### 2. `SchemaMapper` takes an acceptance
 

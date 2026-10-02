@@ -39,6 +39,13 @@ class Field
 
     public bool $importOnly = false;
 
+    /**
+     * Columns a closure reads beyond the one this field writes.
+     *
+     * @var array<int, string>
+     */
+    public array $reads = [];
+
     private function __construct()
     {
         //
@@ -131,6 +138,20 @@ class Field
     public function blob(bool $blob = true): static
     {
         $this->blob = $blob;
+
+        return $this;
+    }
+
+    /**
+     * Declare columns a `set` closure reads in addition to this field's own.
+     *
+     * A closure cannot be introspected, so a field whose outbound direction draws on
+     * several columns would otherwise under-report, and a change to one of the
+     * others would not be recognised as changing the record.
+     */
+    public function reads(string ...$columns): static
+    {
+        $this->reads = [...$this->reads, ...$columns];
 
         return $this;
     }
