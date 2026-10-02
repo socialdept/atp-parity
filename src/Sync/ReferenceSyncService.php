@@ -11,6 +11,7 @@ use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Support\RecordCid;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use Throwable;
 
@@ -213,7 +214,7 @@ class ReferenceSyncService
     /**
      * Resync an existing reference record.
      */
-    public function resyncReference(Model $model, ReferenceMapper $mapper): SyncResult
+    public function resyncReference(Model $model, ReferenceMapper $mapper, bool $force = false): SyncResult
     {
         $uri = $this->getReferenceUri($model, $mapper);
 
@@ -228,6 +229,10 @@ class ReferenceSyncService
 
         try {
             $record = $mapper->toRecord($model);
+
+            if (! $force && $unchanged = $this->referenceAlreadyInRepo($model, $mapper, $record->toArray())) {
+                return SyncResult::unchanged($uri, $unchanged);
+            }
 
             $client = Atp::as($parts['did']);
             $response = $client->atproto->repo->putRecord(
@@ -348,6 +353,33 @@ class ReferenceSyncService
             $model->{$cidColumn} = $ref->cid;
         }
         $model->saveQuietly();
+    }
+
+    /**
+     * The CID this reference record already has in the repo, or null to write.
+     *
+     * Reads the reference record's own CID column rather than the main record's.
+     * The two are written separately, so sharing a column would let one suppress
+     * the other's legitimate write.
+     *
+     * Null whenever the answer is not certain, so the caller writes. Only an
+     * exact match may suppress a write.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    protected function referenceAlreadyInRepo(Model $model, ReferenceMapper $mapper, array $record): ?string
+    {
+        if (! config('atp-parity.sync.skip_unchanged', true)) {
+            return null;
+        }
+
+        $storedCid = $model->getAttribute($mapper->referenceCidColumn());
+
+        if (! is_string($storedCid) || $storedCid === '') {
+            return null;
+        }
+
+        return RecordCid::for($record) === $storedCid ? $storedCid : null;
     }
 
     /**

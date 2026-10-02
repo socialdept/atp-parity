@@ -75,6 +75,14 @@ return [
         // Set to `false` to allow custom lexicons on PDSes that don't have them
         'validate' => env('PARITY_SYNC_VALIDATE', true),
 
+        // Skip a resync when the repo already holds the record byte for byte,
+        // compared by the CID the record would have. Writing an identical record
+        // still produces a signed commit and a firehose event on the author's
+        // PDS, so a sync loop costs them real work for no change.
+        //
+        // Set false to write unconditionally, which is the pre-guard behaviour.
+        'skip_unchanged' => env('PARITY_SYNC_SKIP_UNCHANGED', true),
+
         // Only sync records from these DIDs (null = all DIDs)
         'dids' => null,
 

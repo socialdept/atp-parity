@@ -9,6 +9,7 @@ use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\RecordUnsynced;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Support\RecordCid;
 use Throwable;
 
 /**
@@ -94,7 +95,7 @@ class SyncService
     /**
      * Resync an existing synced record.
      */
-    public function resync(Model $model): SyncResult
+    public function resync(Model $model, bool $force = false): SyncResult
     {
         $mapper = $this->registry->forModel(get_class($model));
 
@@ -102,13 +103,18 @@ class SyncService
             return SyncResult::failed('No mapper registered for model: '.get_class($model));
         }
 
-        return $this->resyncWithMapper($model, $mapper);
+        return $this->resyncWithMapper($model, $mapper, $force);
     }
 
     /**
      * Resync an existing synced record with an explicit mapper.
+     *
+     * `$force` writes even when the repo already holds this exact record. Reserve
+     * it for an operator repairing a repo: an equal CID proves what we last wrote,
+     * not what the repo still holds, so a record deleted or lost out of band is
+     * invisible here and only a forced write restores it.
      */
-    public function resyncWithMapper(Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper): SyncResult
+    public function resyncWithMapper(Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper, bool $force = false): SyncResult
     {
         $uri = $this->getModelUri($model);
 
@@ -124,6 +130,10 @@ class SyncService
 
         try {
             $record = $mapper->toRecord($model);
+
+            if (! $force && $unchanged = $this->alreadyInRepo($model, $record->toArray())) {
+                return SyncResult::unchanged($uri, $unchanged);
+            }
 
             $client = Atp::as($parts['did']);
             $response = $client->atproto->repo->putRecord(
@@ -228,6 +238,35 @@ class SyncService
         $column = config('atp-parity.columns.uri', 'atp_uri');
 
         return $model->{$column};
+    }
+
+    /**
+     * The CID this record already has in the repo, or null if it must be written.
+     *
+     * A PDS addresses a record by the hash of its dag-cbor encoding, so an equal
+     * CID means the repo holds this record byte for byte and writing it would
+     * produce a commit that changes nothing. A sync that runs on every model
+     * save turns that into sustained write traffic against a repo we do not own.
+     *
+     * Returns null whenever the answer is not certain, so the caller writes. Only
+     * an exact match may suppress a write: a false match would mean a real edit
+     * silently never leaves this process.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    protected function alreadyInRepo(Model $model, array $record): ?string
+    {
+        if (! config('atp-parity.sync.skip_unchanged', true)) {
+            return null;
+        }
+
+        $storedCid = $model->getAttribute(config('atp-parity.columns.cid', 'atp_cid'));
+
+        if (! is_string($storedCid) || $storedCid === '') {
+            return null;
+        }
+
+        return RecordCid::for($record) === $storedCid ? $storedCid : null;
     }
 
     /**

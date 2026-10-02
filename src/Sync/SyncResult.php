@@ -12,6 +12,13 @@ readonly class SyncResult
         public ?string $uri = null,
         public ?string $cid = null,
         public ?string $error = null,
+        /**
+         * The repo already held this exact record, so nothing was written.
+         *
+         * Still a success: the record is in the state the caller asked for, so a
+         * caller that only checks `isSuccess()` stays correct.
+         */
+        public bool $unchanged = false,
     ) {
     }
 
@@ -40,6 +47,19 @@ readonly class SyncResult
             success: true,
             uri: $uri,
             cid: $cid,
+        );
+    }
+
+    /**
+     * Create a result for a record the repo already held byte for byte.
+     */
+    public static function unchanged(string $uri, string $cid): self
+    {
+        return new self(
+            success: true,
+            uri: $uri,
+            cid: $cid,
+            unchanged: true,
         );
     }
 

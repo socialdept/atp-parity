@@ -8,6 +8,7 @@ use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Support\RecordCid;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
 use SocialDept\AtpParity\Sync\SyncService;
 use SocialDept\AtpParity\Tests\Fixtures\ReferenceModel;
@@ -373,6 +374,109 @@ class ReferenceSyncServiceTest extends TestCase
 
         $model->refresh();
         $this->assertSame('bafyreiUpdated', $model->atp_reference_cid);
+    }
+
+    /**
+     * Counts writes through Mockery itself rather than a closure, so an expectation
+     * that is never met fails at teardown instead of silently passing.
+     */
+    private function mockPdsExpectingWrites(int $times, string $did, string $returnUri, string $returnCid): void
+    {
+        $response = new \stdClass();
+        $response->uri = $returnUri;
+        $response->cid = $returnCid;
+
+        $repoClient = Mockery::mock();
+        $repoClient->shouldReceive('putRecord')->times($times)->andReturn($response);
+
+        $atprotoClient = Mockery::mock();
+        $atprotoClient->repo = $repoClient;
+
+        $atpClient = Mockery::mock();
+        $atpClient->atproto = $atprotoClient;
+
+        $manager = Mockery::mock();
+        $manager->shouldReceive('as')->with($did)->andReturn($atpClient);
+
+        $this->app->instance('atp-client', $manager);
+    }
+
+    /**
+     * The reference record is the second half of a pair that is rewritten together,
+     * so it needs the same guard as the main record, keyed on its own CID column.
+     */
+    public function test_resync_reference_does_not_write_a_record_the_repo_already_holds(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Unchanged',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        $contentCid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_reference_cid = $contentCid;
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', $contentCid);
+
+        $result = $this->service->resyncReference($model, $this->referenceMapper);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertTrue($result->unchanged);
+        Event::assertNotDispatched(ReferenceSynced::class);
+    }
+
+    /**
+     * A reference record holds a StrongRef to the main record and nothing else, so
+     * the only thing that can change it is the main record's uri or cid. Editing a
+     * column the reference does not carry must not produce a write, which is why
+     * this moves `atp_cid` rather than a title.
+     */
+    public function test_resync_reference_still_writes_when_the_subject_changed(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Before',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(1, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUpdated');
+
+        // The main record moved, so the reference genuinely points somewhere new.
+        $model->atp_cid = 'bafyreiMainMovedOn';
+
+        $result = $this->service->resyncReference($model, $this->referenceMapper);
+
+        $this->assertFalse($result->unchanged);
+    }
+
+    /**
+     * Editing a column the reference record does not carry is the common case: a
+     * model save that changes nothing in the record would otherwise rewrite both
+     * halves of the pair.
+     */
+    public function test_resync_reference_does_not_write_when_an_uncarried_column_changed(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Before',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');
+
+        $model->title = 'A title the reference record does not carry';
+
+        $this->assertTrue($this->service->resyncReference($model, $this->referenceMapper)->unchanged);
     }
 
     public function test_resync_reference_fails_when_not_synced(): void
