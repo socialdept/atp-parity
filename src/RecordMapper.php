@@ -196,7 +196,53 @@ abstract class RecordMapper implements RecordMapperContract
     {
         $recordClass = $this->recordClass();
 
-        return $recordClass::fromArray($this->modelToRecordData($model));
+        // Blobs resolve first, which is the only phase allowed to perform I/O.
+        // Construction after it is pure, so asking what we would write costs
+        // nothing and changes nothing.
+        $data = array_replace_recursive(
+            $this->modelToRecordData($model),
+            $this->resolveBlobs($model),
+        );
+
+        return $recordClass::fromArray($data);
+    }
+
+    /**
+     * Blob references for every blob field this mapper declares.
+     *
+     * Where the bytes live is the host app's business, so it supplies a resolver
+     * through `atp-parity.blobs.resolver`. Without one, declared blob fields are
+     * simply absent from the record rather than failing: a mapper may be migrating
+     * to a declaration before the app has wired resolution up.
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolveBlobs(Model $model): array
+    {
+        $paths = $this->fieldMap()->blobPaths();
+
+        if ($paths === []) {
+            return [];
+        }
+
+        $resolver = config('atp-parity.blobs.resolver');
+
+        if ($resolver === null) {
+            return [];
+        }
+
+        $resolver = is_string($resolver) ? app($resolver) : $resolver;
+        $resolved = [];
+
+        foreach ($paths as $path) {
+            $reference = $resolver->resolve($model, $path);
+
+            if ($reference !== null) {
+                $resolved[$path] = $reference;
+            }
+        }
+
+        return $resolved;
     }
 
     public function updateModel(Model $model, Data $record, array $meta = []): Model

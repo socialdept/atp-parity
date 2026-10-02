@@ -96,6 +96,22 @@ return [
     | thing this file needs to know about it.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Blobs
+    |--------------------------------------------------------------------------
+    |
+    | `resolver` turns a model's attached file into a blob reference, and is the
+    | only part of writing a record allowed to perform I/O. It runs before the
+    | record is constructed so that construction stays pure, which is what makes
+    | "what would we write" a cheap question. An invokable implementing
+    | SocialDept\AtpParity\Contracts\BlobResolver, or null.
+    |
+    */
+    'blobs' => [
+        'resolver' => null,
+    ],
+
     'upcasters' => [
         //
     ],
