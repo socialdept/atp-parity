@@ -64,14 +64,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Sync Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Settings for syncing records to AT Protocol and filtering firehose events.
-    |
-    */
-    /*
-    |--------------------------------------------------------------------------
     | Acceptance
     |--------------------------------------------------------------------------
     |
@@ -85,6 +77,10 @@ return [
     | missing lookup must not read as "everything is local".
     |
     */
+    'acceptance' => [
+        'local_dids' => null,
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Upcasters
@@ -96,30 +92,18 @@ return [
     | thing this file needs to know about it.
     |
     */
-    /*
-    |--------------------------------------------------------------------------
-    | Blobs
-    |--------------------------------------------------------------------------
-    |
-    | `resolver` turns a model's attached file into a blob reference, and is the
-    | only part of writing a record allowed to perform I/O. It runs before the
-    | record is constructed so that construction stays pure, which is what makes
-    | "what would we write" a cheap question. An invokable implementing
-    | SocialDept\AtpParity\Contracts\BlobResolver, or null.
-    |
-    */
-    'blobs' => [
-        'resolver' => null,
-    ],
-
     'upcasters' => [
         //
     ],
 
-    'acceptance' => [
-        'local_dids' => null,
-    ],
-
+    /*
+    |--------------------------------------------------------------------------
+    | Sync Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Settings for syncing records to AT Protocol and filtering firehose events.
+    |
+    */
     'sync' => [
         // Validate records against lexicon schemas on the PDS
         // Set to `false` to allow custom lexicons on PDSes that don't have them
@@ -311,6 +295,13 @@ return [
     |
     */
     'blobs' => [
+        // Turns a model's attached file into a blob reference, and is the only
+        // part of writing a record allowed to perform I/O. It runs before the
+        // record is constructed so construction stays pure, which is what makes
+        // "what would we write" cheap enough to ask before every write.
+        // An invokable implementing Contracts\BlobResolver, or null.
+        'resolver' => null,
+
         // Storage driver: 'filesystem' or 'medialibrary'
         // - filesystem: Uses Laravel filesystem + parity_blob_mappings table
         // - medialibrary: Uses Spatie MediaLibrary (no extra migrations needed)
