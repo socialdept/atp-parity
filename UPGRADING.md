@@ -30,11 +30,11 @@ use SocialDept\AtpParity\Acceptance\Acceptance;
 
 public function accepts(): ?Acceptance
 {
-    return Acceptance::ownWritesOnly();
+    return Acceptance::connectedActors();
 }
 ```
 
-Available: `anything()`, `none()`, `when(callable)`, `ownWritesOnly()`,
+Available: `anything()`, `none()`, `when(callable)`, `connectedActors()`,
 `knownActors()`, and `->and()` / `->or()` to compose. `anything()` is legitimate for
 a genuinely public collection and is deliberately verbose so it reads as a decision.
 
@@ -45,11 +45,11 @@ so they read different lookups and neither falls back to the other:
 // config/atp-parity.php
 'acceptance' => [
     // Do we hold credentials for this repo, so an inbound record may be our own write?
-    'writes_to_repo' => fn (string $did) => LoginMethod::validFor($did)->exists(),
+    'is_connected_actor' => fn (string $did) => LoginMethod::validFor($did)->exists(),
 
     // Do we know this actor at all, whether or not we can write for them? One
     // identified by a signed JWT through an XRPC proxy has no tokens here yet.
-    'knows_actor' => fn (string $did) => User::where('did', $did)->exists(),
+    'is_known_actor' => fn (string $did) => User::where('did', $did)->exists(),
 ],
 ```
 
@@ -65,7 +65,7 @@ new SchemaMapper(
     modelClass: PostModel::class,
     toAttributes: ...,
     toRecordData: ...,
-    accepts: Acceptance::ownWritesOnly(), // new, and required in practice
+    accepts: Acceptance::connectedActors(), // new, and required in practice
 );
 ```
 

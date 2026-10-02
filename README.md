@@ -59,7 +59,7 @@ class PostMapper extends RecordMapper
 
     public function accepts(): ?Acceptance
     {
-        return Acceptance::ownWritesOnly();
+        return Acceptance::connectedActors();
     }
 }
 ```
@@ -112,7 +112,7 @@ class PostMapper extends RecordMapper
 
     public function accepts(): ?Acceptance
     {
-        return Acceptance::ownWritesOnly();
+        return Acceptance::connectedActors();
     }
 }
 ```
@@ -477,10 +477,10 @@ return [
     // the policy that needs it accepts nothing.
     'acceptance' => [
         // Do we hold credentials for this repo, so an inbound record may be our own?
-        'writes_to_repo' => fn (string $did) => \App\Models\LoginMethod::validFor($did)->exists(),
+        'is_connected_actor' => fn (string $did) => \App\Models\LoginMethod::validFor($did)->exists(),
 
         // Do we know this actor at all, whether or not we can write for them?
-        'knows_actor' => fn (string $did) => \App\Models\User::where('did', $did)->exists(),
+        'is_known_actor' => fn (string $did) => \App\Models\User::where('did', $did)->exists(),
     ],
 
     // Steps that bring older record shapes up to the current one. Each declares its

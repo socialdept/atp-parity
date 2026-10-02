@@ -74,33 +74,33 @@ class AcceptanceTest extends TestCase
      */
     public function test_a_policy_accepts_nothing_without_its_configured_lookup(): void
     {
-        config(['atp-parity.acceptance.writes_to_repo' => null, 'atp-parity.acceptance.knows_actor' => null]);
+        config(['atp-parity.acceptance.is_connected_actor' => null, 'atp-parity.acceptance.is_known_actor' => null]);
 
         $record = new TestRecord(text: 'x');
         $meta = ['did' => 'did:plc:ours'];
 
-        $this->assertFalse($this->mapper(Acceptance::ownWritesOnly())->shouldImport($record, $meta));
+        $this->assertFalse($this->mapper(Acceptance::connectedActors())->shouldImport($record, $meta));
         $this->assertFalse($this->mapper(Acceptance::knownActors())->shouldImport($record, $meta));
     }
 
     public function test_each_policy_consults_its_own_lookup(): void
     {
         config([
-            'atp-parity.acceptance.writes_to_repo' => fn (string $did) => $did === 'did:plc:tokens',
-            'atp-parity.acceptance.knows_actor' => fn (string $did) => in_array($did, ['did:plc:tokens', 'did:plc:known'], true),
+            'atp-parity.acceptance.is_connected_actor' => fn (string $did) => $did === 'did:plc:tokens',
+            'atp-parity.acceptance.is_known_actor' => fn (string $did) => in_array($did, ['did:plc:tokens', 'did:plc:known'], true),
         ]);
 
         $record = new TestRecord(text: 'x');
-        $writes = $this->mapper(Acceptance::ownWritesOnly());
-        $knows = $this->mapper(Acceptance::knownActors());
+        $connected = $this->mapper(Acceptance::connectedActors());
+        $known = $this->mapper(Acceptance::knownActors());
 
-        $this->assertTrue($writes->shouldImport($record, ['did' => 'did:plc:tokens']));
-        $this->assertTrue($knows->shouldImport($record, ['did' => 'did:plc:tokens']));
+        $this->assertTrue($connected->shouldImport($record, ['did' => 'did:plc:tokens']));
+        $this->assertTrue($known->shouldImport($record, ['did' => 'did:plc:tokens']));
 
-        $this->assertTrue($knows->shouldImport($record, ['did' => 'did:plc:known']));
+        $this->assertTrue($known->shouldImport($record, ['did' => 'did:plc:known']));
         $this->assertFalse(
-            $writes->shouldImport($record, ['did' => 'did:plc:known']),
-            'An actor we know but hold no tokens for is not a repo we write to.',
+            $connected->shouldImport($record, ['did' => 'did:plc:known']),
+            'An actor we know but hold no tokens for has not connected their account.',
         );
     }
 
@@ -114,20 +114,20 @@ class AcceptanceTest extends TestCase
         $record = new TestRecord(text: 'x');
         $meta = ['did' => 'did:plc:ours'];
 
-        config(['atp-parity.acceptance.writes_to_repo' => fn () => true, 'atp-parity.acceptance.knows_actor' => null]);
+        config(['atp-parity.acceptance.is_connected_actor' => fn () => true, 'atp-parity.acceptance.is_known_actor' => null]);
         $this->assertFalse($this->mapper(Acceptance::knownActors())->shouldImport($record, $meta));
 
-        config(['atp-parity.acceptance.writes_to_repo' => null, 'atp-parity.acceptance.knows_actor' => fn () => true]);
-        $this->assertFalse($this->mapper(Acceptance::ownWritesOnly())->shouldImport($record, $meta));
+        config(['atp-parity.acceptance.is_connected_actor' => null, 'atp-parity.acceptance.is_known_actor' => fn () => true]);
+        $this->assertFalse($this->mapper(Acceptance::connectedActors())->shouldImport($record, $meta));
     }
 
     public function test_a_record_with_no_repo_is_refused_by_both(): void
     {
-        config(['atp-parity.acceptance.writes_to_repo' => fn () => true, 'atp-parity.acceptance.knows_actor' => fn () => true]);
+        config(['atp-parity.acceptance.is_connected_actor' => fn () => true, 'atp-parity.acceptance.is_known_actor' => fn () => true]);
 
         $record = new TestRecord(text: 'x');
 
-        $this->assertFalse($this->mapper(Acceptance::ownWritesOnly())->shouldImport($record, []));
+        $this->assertFalse($this->mapper(Acceptance::connectedActors())->shouldImport($record, []));
         $this->assertFalse($this->mapper(Acceptance::knownActors())->shouldImport($record, []));
     }
 

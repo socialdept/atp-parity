@@ -45,29 +45,32 @@ class Acceptance
     }
 
     /**
-     * Accept only records in a repo we hold credentials for, where an inbound record
-     * may be our own write coming back.
+     * Accept only records from an actor who has connected their account, so we hold
+     * credentials for the repo and an inbound record there may be our own write.
      *
-     * Needs `atp-parity.acceptance.writes_to_repo`.
+     * Not named for authorship: a record another client wrote into a repo we hold
+     * tokens for passes this. The test is the repo relationship.
+     *
+     * Needs `atp-parity.acceptance.is_connected_actor`.
      */
-    public static function ownWritesOnly(): static
+    public static function connectedActors(): static
     {
-        return static::forRepo('writes_to_repo');
+        return static::forLookup('is_connected_actor');
     }
 
     /**
      * Accept records from any actor we know, whether or not we can write for them.
      *
-     * Strictly broader than {@see self::ownWritesOnly()}, and a different question: an
-     * actor identified by a signed JWT through an XRPC proxy is one we know and hold
+     * Strictly broader than {@see self::connectedActors()}, and a different question:
+     * an actor identified by a signed JWT through an XRPC proxy is one we know and hold
      * no tokens for, so their content can be accepted and held until they sign in.
      *
-     * Needs `atp-parity.acceptance.knows_actor`. Deliberately not falling back to the
+     * Needs `atp-parity.acceptance.is_known_actor`. Deliberately not falling back to the
      * write lookup, which would turn "we can write here" into "we have heard of them".
      */
     public static function knownActors(): static
     {
-        return static::forRepo('knows_actor');
+        return static::forLookup('is_known_actor');
     }
 
     public function and(self $other): static
@@ -101,12 +104,12 @@ class Acceptance
     }
 
     /**
-     * A policy backed by one of the configured repo lookups.
+     * A policy backed by one of the configured actor lookups.
      *
      * An unconfigured lookup accepts nothing, which is the safe direction: absent must
      * not read as "yes".
      */
-    protected static function forRepo(string $lookup): static
+    protected static function forLookup(string $lookup): static
     {
         return static::when(function (Data $record, array $meta) use ($lookup): bool {
             $did = $meta['did'] ?? null;

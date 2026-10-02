@@ -30,7 +30,7 @@ use SocialDept\AtpSchema\Data\Data;
  *         'text' => $m->content,
  *         'createdAt' => $m->published_at->toIso8601String(),
  *     ],
- *     accepts: Acceptance::ownWritesOnly(),
+ *     accepts: Acceptance::connectedActors(),
  * );
  *
  * $registry->register($mapper);

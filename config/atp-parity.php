@@ -75,16 +75,16 @@ return [
     | and returning a bool. Neither falls back to the other, and an unconfigured
     | lookup accepts nothing, because absent must not read as "yes".
     |
-    | `writes_to_repo`  do we hold credentials for this repo, so an inbound record
-    |                   there may be our own write coming back
-    | `knows_actor`     do we know this actor at all, whether or not we can write
-    |                   for them. An actor identified by a signed JWT through an
-    |                   XRPC proxy is one we know and hold no tokens for
+    | `is_connected_actor`  have they connected their account, so we hold credentials
+    |                       and an inbound record in that repo may be our own write
+    | `is_known_actor`      do we know this actor at all, whether or not we can write
+    |                       for them. One identified by a signed JWT through an XRPC
+    |                       proxy is known and has no tokens here yet
     |
     */
     'acceptance' => [
-        'writes_to_repo' => null,
-        'knows_actor' => null,
+        'is_connected_actor' => null,
+        'is_known_actor' => null,
     ],
 
     /*
