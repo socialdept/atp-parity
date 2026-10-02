@@ -16,6 +16,11 @@ use Closure;
  * methods cannot be asked which model columns feed the record, so nothing can
  * decide whether a given save is worth a write. A declaration can be asked.
  *
+ * `make()`, `get()` and `set()` are **constructors**, so they do not chain. PHP
+ * cannot give a class both a static `get()` and an instance `get()`, and calling a
+ * static through `->` silently builds a fresh object, discarding whatever was
+ * configured. Use `using()` to add closures to an existing field.
+ *
  * Omitting one side is meaningful rather than an oversight:
  *
  * - no `set`: imported, never written. A field we accept but do not author.
@@ -88,6 +93,26 @@ class Field
     public static function for(string $column): static
     {
         return (new static())->column($column);
+    }
+
+    /**
+     * Add either direction to a field that already has a column.
+     *
+     * The chainable counterpart to `make()`. Named differently because PHP cannot
+     * overload a static constructor and an instance method on one name, and the
+     * alternative, `Field::for('x')->make(...)`, silently throws away the column.
+     */
+    public function using(?callable $get = null, ?callable $set = null): static
+    {
+        if ($get !== null) {
+            $this->get = Closure::fromCallable($get);
+        }
+
+        if ($set !== null) {
+            $this->set = Closure::fromCallable($set);
+        }
+
+        return $this;
     }
 
     public function column(string $column): static
