@@ -2,6 +2,7 @@
 
 namespace SocialDept\AtpParity\Tests\Fixtures;
 
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\Attributes\Lexicon;
 use SocialDept\AtpParity\Fields\Field;
 use SocialDept\AtpParity\RecordMapper;
@@ -36,5 +37,14 @@ class DeclarativeMapper extends RecordMapper
             'derived' => Field::set(fn (TestModel $model) => 'derived:'.$model->content),
             'seenAt' => Field::for('seen_at')->importOnly(),
         ];
+    }
+
+    /**
+     * A test double standing in for an arbitrary collection, so it accepts freely.
+     * A real mapper states a narrower policy.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return Acceptance::anything();
     }
 }

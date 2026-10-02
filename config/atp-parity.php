@@ -70,6 +70,25 @@ return [
     | Settings for syncing records to AT Protocol and filtering firehose events.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Acceptance
+    |--------------------------------------------------------------------------
+    |
+    | Every mapper is an ingest boundary: records arrive from the whole network,
+    | so a mapper declares what it accepts and refuses everything when it has
+    | not said. See SocialDept\AtpParity\Acceptance\Acceptance.
+    |
+    | `local_dids` answers "is this repo one of ours", which only the host app
+    | knows. An invokable class name or a callable taking a DID and returning a
+    | bool. Absent, the policies that depend on it accept nothing, because a
+    | missing lookup must not read as "everything is local".
+    |
+    */
+    'acceptance' => [
+        'local_dids' => null,
+    ],
+
     'sync' => [
         // Validate records against lexicon schemas on the PDS
         // Set to `false` to allow custom lexicons on PDSes that don't have them

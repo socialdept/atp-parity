@@ -3,6 +3,7 @@
 namespace SocialDept\AtpParity\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\RecordMapper;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -34,5 +35,14 @@ class TestMapper extends RecordMapper
             'text' => $model->content,
             'createdAt' => $model->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * A test double standing in for an arbitrary collection, so it accepts freely.
+     * A real mapper states a narrower policy.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return Acceptance::anything();
     }
 }

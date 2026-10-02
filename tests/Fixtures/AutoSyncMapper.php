@@ -2,6 +2,7 @@
 
 namespace SocialDept\AtpParity\Tests\Fixtures;
 
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\RecordMapper;
 
 /**
@@ -22,5 +23,14 @@ class AutoSyncMapper extends RecordMapper
     public function fields(): array
     {
         return ['text' => 'content'];
+    }
+
+    /**
+     * A test double standing in for an arbitrary collection, so it accepts freely.
+     * A real mapper states a narrower policy.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return Acceptance::anything();
     }
 }

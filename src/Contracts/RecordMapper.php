@@ -87,6 +87,13 @@ interface RecordMapper
      * @param  TRecord  $record
      * @param  array{uri?: string, cid?: string, did?: string, rkey?: string}  $meta
      */
+    /**
+     * What this mapper accepts from the network, or null when it has not said.
+     *
+     * @see \SocialDept\AtpParity\Acceptance\Acceptance
+     */
+    public function accepts(): ?\SocialDept\AtpParity\Acceptance\Acceptance;
+
     public function shouldImport(Data $record, array $meta = []): bool;
 
     /**

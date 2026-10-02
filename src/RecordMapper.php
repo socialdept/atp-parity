@@ -4,6 +4,7 @@ namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\Attributes\Lexicon;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
@@ -219,9 +220,29 @@ abstract class RecordMapper implements RecordMapperContract
      * Override this method to add custom import conditions.
      * Return false to skip importing this record.
      */
+    /**
+     * What this mapper accepts from the network, or null when it has not said.
+     *
+     * Records arrive from the whole network, so a mapper that accepts everything
+     * lets any repo write rows in our database. Declaring nothing therefore means
+     * nothing is accepted: see {@see self::shouldImport()}.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return null;
+    }
+
+    /**
+     * Refuses by default, because an ingest boundary that forgot its guard should
+     * import nothing rather than everything.
+     *
+     * A mapper that overrides this method replaces this body entirely and keeps
+     * whatever behaviour it had, which is what lets the declaration arrive without
+     * changing any existing mapper.
+     */
     public function shouldImport(Data $record, array $meta = []): bool
     {
-        return true;
+        return $this->accepts()?->permits($record, $meta, $this) ?? false;
     }
 
     /**

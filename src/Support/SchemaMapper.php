@@ -4,6 +4,7 @@ namespace SocialDept\AtpParity\Support;
 
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\RecordMapper;
 use SocialDept\AtpSchema\Data\Data;
 
@@ -29,6 +30,7 @@ use SocialDept\AtpSchema\Data\Data;
  *         'text' => $m->content,
  *         'createdAt' => $m->published_at->toIso8601String(),
  *     ],
+ *     accepts: Acceptance::ownWritesOnly(),
  * );
  *
  * $registry->register($mapper);
@@ -45,13 +47,23 @@ class SchemaMapper extends RecordMapper
      * @param  class-string<TModel>  $modelClass  The Eloquent model class
      * @param  Closure(TSchema): array  $toAttributes  Convert schema to model attributes
      * @param  Closure(TModel): array  $toRecordData  Convert model to record data
+     * @param  Acceptance|null  $accepts  Which records to accept from the network.
+     *                                    Null accepts nothing, because a mapper
+     *                                    assembled at a call site is still an ingest
+     *                                    boundary and must say what it allows.
      */
     public function __construct(
         protected string $schemaClass,
         protected string $modelClass,
         protected Closure $toAttributes,
         protected Closure $toRecordData,
+        protected ?Acceptance $accepts = null,
     ) {
+    }
+
+    public function accepts(): ?Acceptance
+    {
+        return $this->accepts;
     }
 
     public function recordClass(): string
