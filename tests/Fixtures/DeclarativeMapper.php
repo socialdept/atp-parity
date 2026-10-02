@@ -34,7 +34,7 @@ class DeclarativeMapper extends RecordMapper
             'nested.label' => Field::for('label')->default('untitled'),
             'nested.mode' => Field::for('mode')->enum(TestMode::class),
             'payload' => Field::for('payload')->codec(ReversingCodec::class)->lossy(),
-            'derived' => Field::set(fn (TestModel $model) => 'derived:'.$model->content),
+            'derived' => Field::derived(fn (TestModel $model) => 'derived:'.$model->content),
             'seenAt' => Field::for('seen_at')->importOnly(),
         ];
     }

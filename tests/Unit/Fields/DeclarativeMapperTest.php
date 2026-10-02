@@ -186,18 +186,34 @@ class DeclarativeMapperTest extends TestCase
         $this->assertArrayNotHasKey('payload', $data);
     }
 
-    public function test_field_mirrors_the_eloquent_attribute_constructors(): void
+    /**
+     * A field is built one of two ways, so it always either names a column or states
+     * that it has none. Both directions then chain, and `get()` and `set()` are
+     * instance methods rather than constructors that look chainable.
+     */
+    public function test_a_field_names_a_column_or_declares_it_has_none(): void
     {
-        $both = Field::make(get: fn () => 'a', set: fn () => 'b');
-        $this->assertNotNull($both->get);
-        $this->assertNotNull($both->set);
+        $backed = Field::for('content')
+            ->get(fn () => 'in')
+            ->set(fn () => 'out');
 
-        $in = Field::get(fn () => 'a');
-        $this->assertNotNull($in->get);
-        $this->assertNull($in->set);
+        $this->assertSame('content', $backed->column);
+        $this->assertNotNull($backed->getter);
+        $this->assertNotNull($backed->setter);
+        $this->assertTrue($backed->isImported());
+        $this->assertTrue($backed->isWritten());
 
-        $out = Field::set(fn () => 'b');
-        $this->assertNull($out->get);
-        $this->assertNotNull($out->set);
+        $derived = Field::derived(fn () => 'out');
+
+        $this->assertNull($derived->column);
+        $this->assertNull($derived->getter);
+        $this->assertNotNull($derived->setter);
+        $this->assertFalse($derived->isImported(), 'No column means nothing to import into.');
+        $this->assertTrue($derived->isWritten());
+    }
+
+    public function test_a_field_cannot_be_constructed_without_saying_which(): void
+    {
+        $this->assertFalse((new \ReflectionClass(Field::class))->getConstructor()->isPublic());
     }
 }

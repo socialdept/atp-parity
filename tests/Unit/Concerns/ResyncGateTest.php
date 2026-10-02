@@ -160,7 +160,7 @@ class ResyncGateTest extends TestCase
         $mapper = new class () extends AutoSyncMapper {
             public function fields(): array
             {
-                return ['text' => \SocialDept\AtpParity\Fields\Field::set(fn (TestModel|AutoSyncModel $m) => 'derived')];
+                return ['text' => \SocialDept\AtpParity\Fields\Field::derived(fn (TestModel|AutoSyncModel $m) => 'derived')];
             }
         };
 

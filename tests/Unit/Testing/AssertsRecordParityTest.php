@@ -33,10 +33,9 @@ class AssertsRecordParityTest extends TestCase
                 // Writes the content, reads back something else. The shape of a
                 // default applied on one side and forgotten on the other.
                 return [
-                    'text' => Field::for('content')->using(
-                        get: fn () => 'something else',
-                        set: fn (AutoSyncModel $m) => $m->content,
-                    ),
+                    'text' => Field::for('content')
+                        ->get(fn () => 'something else')
+                        ->set(fn (AutoSyncModel $m) => $m->content),
                 ];
             }
         };

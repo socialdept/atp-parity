@@ -139,8 +139,8 @@ class FieldMap
 
     protected function decode(Field $field, mixed $raw, object $record): mixed
     {
-        if ($field->get !== null) {
-            return ($field->get)($record);
+        if ($field->getter !== null) {
+            return ($field->getter)($record);
         }
 
         if ($raw === null) {
@@ -160,8 +160,8 @@ class FieldMap
 
     protected function encode(Field $field, Model $model): mixed
     {
-        if ($field->set !== null) {
-            return ($field->set)($model);
+        if ($field->setter !== null) {
+            return ($field->setter)($model);
         }
 
         $value = $model->getAttribute((string) $field->column);

@@ -7,17 +7,20 @@ use Closure;
 /**
  * One field of a record, declared once instead of written twice.
  *
- * Shaped like {@see \Illuminate\Database\Eloquent\Casts\Attribute}. The record is
- * the storage side of that analogy, so `get` reads the record and `set` reads the
- * model.
+ * The record is the storage side of the analogy, so `get()` reads the record and
+ * produces a model attribute, and `set()` reads the model and produces a record
+ * value.
  *
- * FIX: `make()`, `get()` and `set()` are constructors and do not chain. PHP allows
- * calling a static through `->`, which silently builds a fresh object and discards
- * the column, so use `using()` to add closures to an existing field.
+ * Built only through {@see self::for()} or {@see self::derived()}, so a field always
+ * either names a column or states that it has none.
  */
 class Field
 {
     public ?string $column = null;
+
+    public ?Closure $getter = null;
+
+    public ?Closure $setter = null;
 
     public mixed $default = null;
 
@@ -36,46 +39,49 @@ class Field
 
     public bool $importOnly = false;
 
-    public function __construct(
-        public ?Closure $get = null,
-        public ?Closure $set = null,
-    ) {
+    private function __construct()
+    {
         //
     }
 
-    public static function make(?callable $get = null, ?callable $set = null): static
-    {
-        return new static(
-            $get === null ? null : Closure::fromCallable($get),
-            $set === null ? null : Closure::fromCallable($set),
-        );
-    }
-
-    public static function get(callable $get): static
-    {
-        return new static(Closure::fromCallable($get));
-    }
-
-    public static function set(callable $set): static
-    {
-        return new static(null, Closure::fromCallable($set));
-    }
-
+    /**
+     * A field backed by a model column, in both directions.
+     */
     public static function for(string $column): static
     {
-        return (new static())->column($column);
+        $field = new static();
+        $field->column = $column;
+
+        return $field;
     }
 
-    /** The chainable counterpart to `make()`, which cannot share its name. */
-    public function using(?callable $get = null, ?callable $set = null): static
+    /**
+     * A field computed from the model and written to the record, with no column.
+     *
+     * Nothing to import into, so it is write-only by construction rather than by an
+     * absence somewhere else.
+     */
+    public static function derived(callable $set): static
     {
-        if ($get !== null) {
-            $this->get = Closure::fromCallable($get);
-        }
+        return (new static())->set($set);
+    }
 
-        if ($set !== null) {
-            $this->set = Closure::fromCallable($set);
-        }
+    /**
+     * Record value to model attribute value.
+     */
+    public function get(callable $get): static
+    {
+        $this->getter = Closure::fromCallable($get);
+
+        return $this;
+    }
+
+    /**
+     * Model attribute value to record value.
+     */
+    public function set(callable $set): static
+    {
+        $this->setter = Closure::fromCallable($set);
 
         return $this;
     }
@@ -139,7 +145,7 @@ class Field
     /** A field with no column has nowhere to import into, so it can only be written. */
     public function isWritten(): bool
     {
-        return ! $this->importOnly && ($this->set !== null || $this->column !== null);
+        return ! $this->importOnly && ($this->setter !== null || $this->column !== null);
     }
 
     public function isImported(): bool
