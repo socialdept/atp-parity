@@ -414,7 +414,7 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $contentCid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $contentCid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->atp_reference_cid = $contentCid;
         $model->saveQuietly();
 
@@ -442,7 +442,7 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(1, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUpdated');
@@ -469,7 +469,7 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');
@@ -494,8 +494,8 @@ class ReferenceSyncServiceTest extends TestCase
         ]);
 
         // Both records already match what we would write, so nothing is due.
-        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toArray());
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toRecord());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(2, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiForced');
@@ -516,8 +516,8 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toArray());
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toRecord());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');

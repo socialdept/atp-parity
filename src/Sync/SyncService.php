@@ -131,7 +131,12 @@ class SyncService
         try {
             $record = $mapper->toRecord($model);
 
-            if (! $force && $unchanged = $this->alreadyInRepo($model, $record->toArray())) {
+            // INFO: hash `toRecord()`, not `toArray()`. A PDS adds the top-level
+            // `$type` before it hashes, so the CID we stored is of the record
+            // including it. `toArray()` omits it, and comparing that form never
+            // matches any record ever written: the guard reads as "changed" every
+            // time and the skip never happens.
+            if (! $force && $unchanged = $this->alreadyInRepo($model, $record->toRecord())) {
                 return SyncResult::unchanged($uri, $unchanged);
             }
 

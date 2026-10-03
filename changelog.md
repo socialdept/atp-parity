@@ -2,6 +2,21 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v0.6.2
+
+### Fixed
+- **The skip-unchanged guard never fired.** `SyncService` and `ReferenceSyncService`
+  hashed `Data::toArray()`, which omits the top-level `$type`. A PDS adds `$type`
+  itself before hashing, so a stored CID is always the address of the
+  `$type`-bearing record and the comparison could not match for any record ever
+  written. Every resync wrote, which is the behaviour v0.6.0 was released to stop.
+  Both guards now hash `Data::toRecord()`.
+
+  The suite could not catch this: each test minted its fake PDS response with the
+  same `toArray()` expression the guard used, so the error cancelled out on both
+  sides. Those now mint from `toRecord()`, which is what a PDS returns, and
+  `RecordCidTest` pins `$type` as part of a record's address.
+
 ## v0.5.0
 
 ### Added
