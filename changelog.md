@@ -17,6 +17,14 @@ All notable changes to `atp-parity` will be documented in this file.
   sides. Those now mint from `toRecord()`, which is what a PDS returns, and
   `RecordCidTest` pins `$type` as part of a record's address.
 
+### Added
+- **`$force` on the sync-or-create path.** `syncWithReference()`,
+  `syncReferenceOnly()` and `syncAsWithMapper()` now take `bool $force = false`
+  and thread it to the `resync*` call they delegate to for an already-synced
+  model. Operator-facing surfaces call these rather than a `resync*`, so a force
+  that stopped at the resync methods could not be reached from the one place a
+  human presses "Resync". Default `false`, so existing callers are unchanged.
+
 ## v0.5.0
 
 ### Added

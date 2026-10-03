@@ -57,12 +57,12 @@ class SyncService
      *
      * Use this when a model has multiple mappers (e.g., main + reference records).
      */
-    public function syncAsWithMapper(string $did, Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper): SyncResult
+    public function syncAsWithMapper(string $did, Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper, bool $force = false): SyncResult
     {
         // Check if already synced
         $existingUri = $this->getModelUri($model);
         if ($existingUri) {
-            return $this->resyncWithMapper($model, $mapper);
+            return $this->resyncWithMapper($model, $mapper, $force);
         }
 
         try {

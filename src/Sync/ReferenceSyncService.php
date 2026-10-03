@@ -40,7 +40,8 @@ class ReferenceSyncService
         string $did,
         Model $model,
         ReferenceMapper $referenceMapper,
-        ?bool $rollbackOnFailure = null
+        ?bool $rollbackOnFailure = null,
+        bool $force = false
     ): ReferenceSyncResult {
         $rollbackOnFailure ??= config('atp-parity.references.rollback_on_failure', true);
 
@@ -53,14 +54,14 @@ class ReferenceSyncService
         }
 
         // Step 1: Sync main record using the main mapper
-        $mainResult = $this->syncService->syncAsWithMapper($did, $model, $mainMapper);
+        $mainResult = $this->syncService->syncAsWithMapper($did, $model, $mainMapper, $force);
 
         if ($mainResult->isFailed()) {
             return ReferenceSyncResult::failed($mainResult->error);
         }
 
         // Step 2: Create reference record
-        $referenceResult = $this->syncReferenceOnly($did, $model, $referenceMapper);
+        $referenceResult = $this->syncReferenceOnly($did, $model, $referenceMapper, $force);
 
         if ($referenceResult->isFailed() && $rollbackOnFailure) {
             // Rollback: delete the main record
@@ -98,7 +99,8 @@ class ReferenceSyncService
     public function syncReferenceOnly(
         string $did,
         Model $model,
-        ReferenceMapper $mapper
+        ReferenceMapper $mapper,
+        bool $force = false
     ): SyncResult {
         // Verify main record exists
         $mainUri = $this->getMainUri($model);
@@ -112,7 +114,7 @@ class ReferenceSyncService
         // Check if reference already synced
         $existingUri = $this->getReferenceUri($model, $mapper);
         if ($existingUri) {
-            return $this->resyncReference($model, $mapper);
+            return $this->resyncReference($model, $mapper, $force);
         }
 
         try {

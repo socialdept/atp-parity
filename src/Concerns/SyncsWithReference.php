@@ -26,7 +26,7 @@ trait SyncsWithReference
      *
      * Automatically detects the DID from the model.
      */
-    public function syncWithReference(): ReferenceSyncResult
+    public function syncWithReference(bool $force = false): ReferenceSyncResult
     {
         $did = $this->syncAsDid();
 
@@ -34,13 +34,13 @@ trait SyncsWithReference
             return ReferenceSyncResult::failed('No DID associated with model.');
         }
 
-        return $this->syncWithReferenceAs($did);
+        return $this->syncWithReferenceAs($did, $force);
     }
 
     /**
      * Sync both main and reference records as a specific DID.
      */
-    public function syncWithReferenceAs(string $did): ReferenceSyncResult
+    public function syncWithReferenceAs(string $did, bool $force = false): ReferenceSyncResult
     {
         $mapper = $this->getReferenceMapper();
 
@@ -48,13 +48,13 @@ trait SyncsWithReference
             return ReferenceSyncResult::failed('No reference mapper registered for model: '.static::class);
         }
 
-        return app(ReferenceSyncService::class)->syncWithReference($did, $this, $mapper);
+        return app(ReferenceSyncService::class)->syncWithReference($did, $this, $mapper, force: $force);
     }
 
     /**
      * Sync only the reference record (main record must already exist).
      */
-    public function syncReferenceOnly(): SyncResult
+    public function syncReferenceOnly(bool $force = false): SyncResult
     {
         $did = $this->syncAsDid();
 
@@ -62,13 +62,13 @@ trait SyncsWithReference
             return SyncResult::failed('No DID associated with model.');
         }
 
-        return $this->syncReferenceOnlyAs($did);
+        return $this->syncReferenceOnlyAs($did, $force);
     }
 
     /**
      * Sync only the reference record as a specific DID.
      */
-    public function syncReferenceOnlyAs(string $did): SyncResult
+    public function syncReferenceOnlyAs(string $did, bool $force = false): SyncResult
     {
         $mapper = $this->getReferenceMapper();
 
@@ -76,7 +76,7 @@ trait SyncsWithReference
             return SyncResult::failed('No reference mapper registered for model: '.static::class);
         }
 
-        return app(ReferenceSyncService::class)->syncReferenceOnly($did, $this, $mapper);
+        return app(ReferenceSyncService::class)->syncReferenceOnly($did, $this, $mapper, $force);
     }
 
     /**
