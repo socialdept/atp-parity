@@ -54,6 +54,28 @@ class RecordCidTest extends TestCase
         $this->assertNotSame(RecordCid::for($record), RecordCid::for($withLinkAsPlainMap));
     }
 
+    /**
+     * The `$type` is part of a record's address, so it must be part of what we hash.
+     *
+     * A PDS adds the top-level `$type` itself before hashing, which is why every
+     * other test here agrees with a real CID: they all start from a record read back
+     * from a PDS, where it is already present. `Data::toArray()` omits it and
+     * `Data::toRecord()` adds it, so a guard built on the former compares a hash no
+     * PDS will ever report and skips nothing.
+     */
+    public function test_the_type_is_part_of_the_hashed_record(): void
+    {
+        $record = $this->realRecord();
+
+        $this->assertArrayHasKey('$type', $record, 'The fixture must be the record as a PDS stores it.');
+
+        $withoutType = $record;
+        unset($withoutType['$type']);
+
+        $this->assertSame(self::REAL_CID, RecordCid::for($record));
+        $this->assertNotSame(self::REAL_CID, RecordCid::for($withoutType));
+    }
+
     public function test_it_is_stable_across_calls(): void
     {
         $this->assertSame(RecordCid::for($this->realRecord()), RecordCid::for($this->realRecord()));

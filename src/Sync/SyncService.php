@@ -57,12 +57,12 @@ class SyncService
      *
      * Use this when a model has multiple mappers (e.g., main + reference records).
      */
-    public function syncAsWithMapper(string $did, Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper): SyncResult
+    public function syncAsWithMapper(string $did, Model $model, \SocialDept\AtpParity\Contracts\RecordMapper $mapper, bool $force = false): SyncResult
     {
         // Check if already synced
         $existingUri = $this->getModelUri($model);
         if ($existingUri) {
-            return $this->resyncWithMapper($model, $mapper);
+            return $this->resyncWithMapper($model, $mapper, $force);
         }
 
         try {
@@ -131,7 +131,12 @@ class SyncService
         try {
             $record = $mapper->toRecord($model);
 
-            if (! $force && $unchanged = $this->alreadyInRepo($model, $record->toArray())) {
+            // INFO: hash `toRecord()`, not `toArray()`. A PDS adds the top-level
+            // `$type` before it hashes, so the CID we stored is of the record
+            // including it. `toArray()` omits it, and comparing that form never
+            // matches any record ever written: the guard reads as "changed" every
+            // time and the skip never happens.
+            if (! $force && $unchanged = $this->alreadyInRepo($model, $record->toRecord())) {
                 return SyncResult::unchanged($uri, $unchanged);
             }
 

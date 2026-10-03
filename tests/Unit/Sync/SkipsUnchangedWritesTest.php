@@ -60,7 +60,7 @@ class SkipsUnchangedWritesTest extends TestCase
 
     private function contentCidFor(TestModel $model): string
     {
-        return RecordCid::for((new TestMapper())->toRecord($model)->toArray());
+        return RecordCid::for((new TestMapper())->toRecord($model)->toRecord());
     }
 
     /**

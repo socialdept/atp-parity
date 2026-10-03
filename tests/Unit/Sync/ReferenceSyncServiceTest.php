@@ -414,7 +414,7 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $contentCid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $contentCid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->atp_reference_cid = $contentCid;
         $model->saveQuietly();
 
@@ -442,7 +442,7 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(1, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUpdated');
@@ -469,7 +469,7 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');
@@ -494,8 +494,8 @@ class ReferenceSyncServiceTest extends TestCase
         ]);
 
         // Both records already match what we would write, so nothing is due.
-        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toArray());
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toRecord());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(2, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiForced');
@@ -516,13 +516,59 @@ class ReferenceSyncServiceTest extends TestCase
             'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
         ]);
 
-        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toArray());
-        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toArray());
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toRecord());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
         $model->saveQuietly();
 
         $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');
 
         $this->service->resyncWithReference($model, $this->referenceMapper);
+    }
+
+    /**
+     * The operator-facing surfaces call `syncWithReference()`, not a `resync*`, so a
+     * force that stopped at the resync methods could not be reached from the one
+     * place a human presses "Resync". Both halves must write for an already-synced
+     * model whose records are byte-identical.
+     */
+    public function test_force_reaches_the_sync_or_create_path(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Unchanged',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toRecord());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(2, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiForced');
+
+        $this->service->syncWithReference('did:plc:test', $model, $this->referenceMapper, force: true);
+    }
+
+    /**
+     * Without force the same call writes nothing, so the test above is not passing
+     * on an unrelated path.
+     */
+    public function test_the_sync_or_create_path_still_skips_an_unchanged_pair(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Unchanged',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.ref/existing',
+        ]);
+
+        $model->atp_cid = RecordCid::for($this->registry->forLexicon('app.test.main')->toRecord($model)->toRecord());
+        $model->atp_reference_cid = RecordCid::for($this->referenceMapper->toRecord($model)->toRecord());
+        $model->saveQuietly();
+
+        $this->mockPdsExpectingWrites(0, 'did:plc:test', 'at://did:plc:test/app.test.ref/existing', 'bafyreiUnused');
+
+        $this->service->syncWithReference('did:plc:test', $model, $this->referenceMapper);
     }
 
     public function test_resync_reference_fails_when_not_synced(): void
