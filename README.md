@@ -33,9 +33,9 @@ Think of it as Laravel's model casts, but for AT Protocol records.
 ## Quick Example
 
 ```php
+use SocialDept\AtpParity\Acceptance\Acceptance;
+use SocialDept\AtpParity\Fields\Field;
 use SocialDept\AtpParity\RecordMapper;
-use SocialDept\AtpSchema\Data\Data;
-use Illuminate\Database\Eloquent\Model;
 
 class PostMapper extends RecordMapper
 {
@@ -49,23 +49,28 @@ class PostMapper extends RecordMapper
         return \App\Models\Post::class;
     }
 
-    protected function recordToAttributes(Data $record): array
+    public function fields(): array
     {
         return [
-            'content' => $record->text,
-            'published_at' => $record->createdAt,
+            'text' => 'content',
+            'createdAt' => Field::for('published_at'),
         ];
     }
 
-    protected function modelToRecordData(Model $model): array
+    public function accepts(): ?Acceptance
     {
-        return [
-            'text' => $model->content,
-            'createdAt' => $model->published_at->toIso8601String(),
-        ];
+        return Acceptance::connectedActors();
     }
 }
 ```
+
+One declaration gives both directions. It also lets the package answer which columns
+end up in the record, so a save touching none of them does not write to the author's
+repo.
+
+`accepts()` is not optional. A mapper is an ingest boundary, and one that has not said
+what it allows imports nothing. See [Upgrading](UPGRADING.md) if you are coming from
+0.6 or earlier.
 
 ## Installation
 
@@ -76,7 +81,7 @@ composer require socialdept/atp-parity
 Optionally publish the configuration:
 
 ```bash
-php artisan vendor:publish --tag=parity-config
+php artisan vendor:publish --tag=atp-parity-config
 ```
 
 ## Getting Started
@@ -100,22 +105,46 @@ class PostMapper extends RecordMapper
         return \App\Models\Post::class;
     }
 
-    protected function recordToAttributes(Data $record): array
+    public function fields(): array
     {
-        return ['content' => $record->text];
+        return ['text' => 'content'];
     }
 
-    protected function modelToRecordData(Model $model): array
+    public function accepts(): ?Acceptance
     {
-        return ['text' => $model->content];
+        return Acceptance::connectedActors();
     }
 }
 ```
 
+A field can name a column directly, carry a default, cast an enum, delegate to a
+codec, or supply either direction as a closure:
+
+```php
+public function fields(): array
+{
+    return [
+        'text' => 'content',
+        'preferences.timezone' => Field::for('timezone')->default('UTC'),
+        'theme' => Field::for('palette')->codec(ThemeCodec::class)->lossy(),
+        'url' => Field::derived(fn ($model) => $model->url()),
+        'avatar' => Field::for('avatar')->blob(),
+    ];
+}
+```
+
+A field is built with `Field::for($column)`, or `Field::derived($closure)` when it has
+no column and is written only. Everything else chains: `get()`, `set()`, `default()`,
+`codec()`, `enum()`, `lossy()`, `blob()`, `importOnly()`.
+
+Where a translation does not fit a declaration, override `recordToAttributes()` or
+`modelToRecordData()` instead. That is still supported and is the right choice for
+something like rich text.
+
 ### 2. Register Your Mapper
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 return [
     'mappers' => [
         App\AtpMappers\PostMapper::class,
@@ -250,6 +279,7 @@ For detailed documentation on specific topics:
 - [atp-client Integration](docs/atp-client-integration.md) - RecordHelper and fetching
 - [atp-signals Integration](docs/atp-signals-integration.md) - ParitySignal and firehose sync
 - [Importing](docs/importing.md) - Syncing historical data
+- [Upgrading](UPGRADING.md) - Breaking changes between versions
 
 ## Model Traits
 
@@ -376,10 +406,20 @@ class Post extends Model
 When enabled, the model automatically syncs:
 
 ```php
-$post = Post::create(['content' => 'Hello!']);  // Syncs to ATP
-$post->update(['content' => 'Updated']);         // Updates ATP record
-$post->delete();                                  // Removes from ATP
+$post = Post::create(['content' => 'Hello!']);   // Syncs to ATP
+$post->update(['content' => 'Updated']);         // Updates the record
+$post->update(['view_count' => 41]);             // No write: not in the record
+$post->delete();                                 // Removes from ATP
 ```
+
+An update only syncs when it changed a column the record actually contains, which the
+mapper's `fields()` declaration determines. A mapper that overrides its own directions
+cannot report that, so every update syncs, as before.
+
+Before writing, an unchanged record is skipped by comparing the CID it would have
+against the one already stored. Set `PARITY_SYNC_SKIP_UNCHANGED=false` to disable, and
+pass `resync(force: true)` when repairing a repo, where an equal CID proves what was
+last written rather than what the repo still holds.
 
 Failed syncs due to expired OAuth sessions can be captured and retried after re-authentication. See [Automatic Syncing](docs/auto-sync.md) for complete documentation including pending sync configuration.
 
@@ -419,7 +459,7 @@ php artisan vendor:publish --tag=parity-migrations-pending-syncs
 ## Configuration
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 return [
     // Registered mappers
     'mappers' => [
@@ -433,8 +473,33 @@ return [
         'cid' => 'atp_cid',
     ],
 
+    // Two different questions, neither falling back to the other. Without a lookup
+    // the policy that needs it accepts nothing.
+    'acceptance' => [
+        // Do we hold credentials for this repo, so an inbound record may be our own?
+        'is_connected_actor' => fn (string $did) => \App\Models\LoginMethod::validFor($did)->exists(),
+
+        // Do we know this actor at all, whether or not we can write for them?
+        'is_known_actor' => fn (string $did) => \App\Models\User::where('did', $did)->exists(),
+    ],
+
+    // Steps that bring older record shapes up to the current one. Each declares its
+    // lexicon and position with #[UpcastsFrom].
+    'upcasters' => [
+        App\AtpUpcasters\SplitPalette::class,
+    ],
+
+    'sync' => [
+        // Skip a resync when the repo already holds the record byte for byte.
+        'skip_unchanged' => env('PARITY_SYNC_SKIP_UNCHANGED', true),
+    ],
+
     // Blob handling configuration
     'blobs' => [
+        // Turns a model's attached file into a blob reference. The only part of
+        // writing a record allowed to perform I/O, and it runs before construction.
+        'resolver' => App\Atp\MediaBlobResolver::class,
+
         // 'filesystem' (requires migrations) or 'medialibrary' (no extra migrations)
         'storage_driver' => \SocialDept\AtpParity\Enums\BlobStorageDriver::Filesystem,
         'download_on_import' => env('PARITY_BLOB_DOWNLOAD', false),
@@ -480,17 +545,28 @@ The `Record` class extends `atp-schema`'s `Data` and implements `atp-client`'s `
 
 ## Requirements
 
-- PHP 8.2+
-- Laravel 10, 11, or 12
-- [socialdept/atp-schema](https://github.com/socialdept/atp-schema) ^0.3
-- [socialdept/atp-client](https://github.com/socialdept/atp-client) ^0.0
-- [socialdept/atp-resolver](https://github.com/socialdept/atp-resolver) ^1.1
-- [socialdept/atp-signals](https://github.com/socialdept/atp-signals) ^1.1
+- PHP 8.3+
+- Laravel 11, 12, or 13
+- [socialdept/atp-schema](https://github.com/socialdept/atp-schema) ^0.4
+- [socialdept/atp-cbor](https://github.com/socialdept/atp-cbor) ^0.2
+- [socialdept/atp-client](https://github.com/socialdept/atp-client) ^0.1 || ^0.2 || ^0.3
+- [socialdept/atp-support](https://github.com/socialdept/atp-support) ^0.3
+- [socialdept/atp-signals](https://github.com/socialdept/atp-signals) ^2.1
 
 ## Testing
 
 ```bash
 composer test
+```
+
+Point the shipped assertions at each of your mappers. The second one is the important
+one: your own writes come back as firehose events, so a mapper whose ingest is not a
+no-op dirties the row, which resyncs, which writes, which produces the next event.
+
+```php
+use SocialDept\AtpParity\Testing\AssertsRecordParity;
+
+$this->assertRecordParity(new PostMapper, $savedPost);
 ```
 
 ## Resources
@@ -506,6 +582,17 @@ composer test
 Found a bug or have a feature request? [Open an issue](https://github.com/socialdept/atp-parity/issues).
 
 Want to contribute? Check out the [contribution guidelines](contributing.md).
+
+## Upgrading
+
+See [UPGRADING.md](UPGRADING.md) for breaking changes between versions.
+
+**1.0 needs two changes.** A mapper now imports nothing until it declares `accepts()`,
+and `SchemaMapper` takes an acceptance argument. A mapper that overrides
+`shouldImport()` itself is unaffected.
+
+Everything else in 1.0 is additive: declared fields, record upcasting, the blob
+resolver, and the parity assertions are all opt-in.
 
 ## Changelog
 

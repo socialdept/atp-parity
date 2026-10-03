@@ -65,7 +65,7 @@ trait AutoSyncsWithReference
             if ($model->isFullySynced() && $model->shouldAutoSyncReference()) {
                 $mapper = $model->getReferenceMapper();
 
-                if ($mapper) {
+                if ($mapper && static::pairCouldHaveChanged($model, $mapper)) {
                     try {
                         // Resync BOTH main and reference records
                         $result = app(ReferenceSyncService::class)->resyncWithReference($model, $mapper);
@@ -124,6 +124,34 @@ trait AutoSyncsWithReference
                 }
             }
         });
+    }
+
+    /**
+     * Whether this update could have changed either half of the pair.
+     *
+     * Considers both mappers because this hook resyncs them together.
+     *
+     * @see \SocialDept\AtpParity\Concerns\AutoSyncsWithAtp::recordCouldHaveChanged()
+     */
+    protected static function pairCouldHaveChanged(Model $model, ReferenceMapper $referenceMapper): bool
+    {
+        $columns = [];
+
+        foreach ([$referenceMapper, $referenceMapper->mainMapper()] as $mapper) {
+            if (! $mapper) {
+                continue;
+            }
+
+            $mapperColumns = $mapper->recordColumns();
+
+            if ($mapperColumns === null || $mapperColumns === []) {
+                return true;
+            }
+
+            $columns = [...$columns, ...$mapperColumns];
+        }
+
+        return $columns === [] || $model->wasChanged(array_values(array_unique($columns)));
     }
 
     /**

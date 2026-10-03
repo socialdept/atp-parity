@@ -13,6 +13,7 @@ use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\Sync\ConflictDetector;
 use SocialDept\AtpParity\Sync\ConflictResolver;
 use SocialDept\AtpParity\Sync\ConflictStrategy;
+use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\Data;
 use SocialDept\AtpSignals\Events\SignalEvent;
 use SocialDept\AtpSignals\Signals\Signal;
@@ -230,7 +231,11 @@ class ParitySignal extends Signal
 
         // Try to create the record - may fail if data is malformed
         try {
-            $record = $recordClass::fromArray((array) $commit->record);
+            // INFO: upcast before hydration. The DTO is the current lexicon, so an
+            // older record would fail here or lose fields it does not declare.
+            $record = $recordClass::fromArray(
+                app(UpcasterChain::class)->upcast($commit->collection, (array) $commit->record)
+            );
         } catch (\Throwable $e) {
             // Validation disabled - re-throw the exception
             if (! $validationMode || $validationMode === ValidationMode::Disabled) {

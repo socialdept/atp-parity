@@ -34,6 +34,19 @@ interface RecordMapper
     public function lexicon(): string;
 
     /**
+     * @return array<string, \SocialDept\AtpParity\Fields\Field|string>
+     */
+    public function fields(): array;
+
+    /**
+     * Null when the mapper writes its own directions, so a caller must assume the
+     * record changed.
+     *
+     * @return array<int, string>|null
+     */
+    public function recordColumns(): ?array;
+
+    /**
      * Convert a Record DTO to an Eloquent Model.
      *
      * @param  TRecord  $record
@@ -69,6 +82,11 @@ interface RecordMapper
      * @param  TRecord  $record
      * @param  array{uri?: string, cid?: string, did?: string, rkey?: string}  $meta
      */
+    /**
+     * @see \SocialDept\AtpParity\Acceptance\Acceptance
+     */
+    public function accepts(): ?\SocialDept\AtpParity\Acceptance\Acceptance;
+
     public function shouldImport(Data $record, array $meta = []): bool;
 
     /**
