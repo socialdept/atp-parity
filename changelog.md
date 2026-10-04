@@ -38,6 +38,57 @@ All notable changes to `atp-parity` will be documented in this file.
   on any object, and Carbon's returns the date parts rather than a date, so the value
   reached a date cast as an array and threw. A `DateTimeInterface` now passes through.
 
+## v1.0.1
+
+### Fixed
+- **The skip-unchanged guard was inert on the 1.0 line.** The same defect fixed in
+  v0.6.2: `SyncService` and `ReferenceSyncService` hashed `Data::toArray()`, which omits
+  the top-level `$type`. A PDS adds `$type` itself before hashing, so a stored CID is
+  always the address of the `$type`-bearing record and the comparison could not match
+  for any record ever written. v1.0.0 branched without the v0.6.2 fix and so shipped
+  with the guard disabled, which means every resync wrote. Both guards now hash
+  `Data::toRecord()`.
+
+  **Anyone on v1.0.0 should move to this release.** The guard there does nothing.
+
+### Added
+- **`$force` on the sync-or-create path.** `syncWithReference()`, `syncReferenceOnly()`
+  and `syncAsWithMapper()` take `bool $force = false` and thread it to the `resync*`
+  call they delegate to for an already-synced model. Operator-facing surfaces call
+  these rather than a `resync*`, so with the guard working a Resync pressed on a
+  byte-identical record would report success and write nothing.
+
+  Every new parameter defaults to false, which is the previous behaviour.
+
+## v1.0.0
+
+A mapper declares its fields instead of writing both directions, an ingest boundary
+refuses what it has not allowed, records of older shapes are brought forward before
+anything reads them, and blob uploads leave record construction.
+
+**See UPGRADING.md. Three changes need action.**
+
+### Changed
+- **A mapper imports nothing until it declares `accepts()`.** Ingest is default deny. A
+  mapper that overrides `shouldImport()` itself is unaffected, which is most existing
+  mappers.
+- **`SchemaMapper` takes an acceptance argument.**
+- **Protocol metadata is written with `setAttribute()` rather than filled**, so a model
+  with a real `$fillable` no longer silently loses its `uri` and `cid`. If you override
+  `applyMeta()`, the metadata columns moved to `applyMetaColumns()`, and calling
+  `parent::applyMeta()` still works.
+
+### Added
+- **`fields()` declarations.** A mapper returns a map of record path to `Field` and the
+  package derives both directions from it, rather than two hand-written halves that
+  nothing checks agree. Brings `Field`, `RecordCodec`, and `recordColumns()` with the
+  resync gate it enables: a save only pushes when a column the record depends on changed.
+- **`Acceptance`**, with `connectedActors()` and `knownActors()`.
+- **Record upcasting**, so a record written in an older shape is brought forward before
+  anything reads it.
+- **`AssertsRecordParity`** test assertions.
+- **Blob resolution before construction**, so record construction stays free of I/O.
+
 ## v0.6.2
 
 ### Fixed
