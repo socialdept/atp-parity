@@ -9,7 +9,7 @@ All notable changes to `atp-parity` will be documented in this file.
   field's value goes once the encoded record exceeds a threshold, and the record is
   read back the same way on import. A record has a hard ceiling of 1 MiB
   (`MAX_CBOR_RECORD_SIZE`) and the guidance is to stay within a few dozen KBytes, which
-  a mapper could not honour on its own: it has no way to know how large the record it
+  a mapper could not honor on its own: it has no way to know how large the record it
   contributes to has become.
 
   Opt in. A field that does not declare it never touches the blob path, and a mapper
@@ -31,7 +31,7 @@ All notable changes to `atp-parity` will be documented in this file.
   it, every size check would upload a blob and no record could read as over the limit.
 
 - **`DataModel`**, the JSON-form to data-model conversion extracted from `RecordCid` so
-  hashing and measuring agree on what a record is. `RecordCid` behaviour is unchanged.
+  hashing and measuring agree on what a record is. `RecordCid` behavior is unchanged.
 
 ### Fixed
 - **A declared date field decoded to an array.** `FieldMap::plain()` called `toArray()`
@@ -58,7 +58,7 @@ All notable changes to `atp-parity` will be documented in this file.
   these rather than a `resync*`, so with the guard working a Resync pressed on a
   byte-identical record would report success and write nothing.
 
-  Every new parameter defaults to false, which is the previous behaviour.
+  Every new parameter defaults to false, which is the previous behavior.
 
 ## v1.0.0
 
