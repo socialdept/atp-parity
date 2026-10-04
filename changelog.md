@@ -112,6 +112,36 @@ anything reads them, and blob uploads leave record construction.
   that stopped at the resync methods could not be reached from the one place a
   human presses "Resync". Default `false`, so existing callers are unchanged.
 
+## v0.6.1
+
+### Fixed
+- **`resyncWithReference()` ignored `$force`.** v0.6.0 added the flag to `resync()`,
+  `resyncWithMapper()` and `resyncReference()`, but not to the combined entry point a
+  repair tool uses for a model carrying a reference record. A forced resync of such a
+  model skipped both writes whenever the repo already held them, which is exactly the
+  case a repair is pressed for.
+
+## v0.6.0
+
+### Added
+- **A resync skips the write when the repo already holds the record byte for byte.**
+  The CID the record would have is compared against the stored `atp_cid` and the
+  `putRecord` is skipped when they match, so a sync wired to model saves no longer
+  writes unchanged records into an author's repo.
+
+  Additive and backwards compatible:
+  - `SyncResult` gains an `unchanged` flag and an `unchanged()` constructor. It reports
+    success, so callers checking `isSuccess()` need no change.
+  - `resync()`, `resyncWithMapper()` and `resyncReference()` gain an optional `$force`.
+  - `PARITY_SYNC_SKIP_UNCHANGED` disables the comparison from env.
+
+  The guard did not actually fire until v0.6.2 on this line, and until v1.0.1 on the
+  1.0 line. See those entries.
+
+### Changed
+- **Declares `socialdept/atp-cbor` directly**, which until now was reached only through
+  `atp-signals`.
+
 ## v0.5.0
 
 ### Added
