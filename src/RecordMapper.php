@@ -3,14 +3,19 @@
 namespace SocialDept\AtpParity;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\Attributes\Lexicon;
+use SocialDept\AtpParity\Blob\BlobManager;
 use SocialDept\AtpParity\Contracts\DeferredReferenceStore;
 use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
 use SocialDept\AtpParity\Fields\FieldMap;
+use SocialDept\AtpParity\Support\BlobReferences;
+use SocialDept\AtpParity\Support\ModelDid;
+use SocialDept\AtpParity\Support\RecordSize;
 use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
@@ -31,6 +36,8 @@ abstract class RecordMapper implements RecordMapperContract
     private static array $lexicons = [];
 
     private ?FieldMap $fieldMap = null;
+
+    protected static bool $overflowEnabled = true;
 
     /**
      * Get the Record class this mapper handles.
@@ -195,6 +202,8 @@ abstract class RecordMapper implements RecordMapperContract
             $this->resolveBlobs($model),
         );
 
+        $data = $this->applyOverflow($model, $data);
+
         // The write half of a deprecation. A mapper only knows the current shape, so
         // keeping a superseded property populated has to happen here.
         $data = app(UpcasterChain::class)->applyDeprecations($this->lexicon(), $data);
@@ -237,6 +246,89 @@ abstract class RecordMapper implements RecordMapperContract
         }
 
         return $resolved;
+    }
+
+    /**
+     * Build records without overflowing, for callers measuring the inline size.
+     *
+     * Overflowing during measurement would upload a blob per check and report a
+     * size that can never exceed the threshold.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    public static function withoutOverflow(callable $callback): mixed
+    {
+        $previous = static::$overflowEnabled;
+        static::$overflowEnabled = false;
+
+        try {
+            return $callback();
+        } finally {
+            static::$overflowEnabled = $previous;
+        }
+    }
+
+    /**
+     * Move declared fields into a blob once the record exceeds their threshold.
+     *
+     * Measured with the `$type` a PDS adds before it hashes, so the number is
+     * the one the server sees.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function applyOverflow(Model $model, array $data): array
+    {
+        $fields = $this->fieldMap()->overflowFields();
+
+        if ($fields === [] || ! static::$overflowEnabled) {
+            return $data;
+        }
+
+        $default = (int) config('atp-parity.records.overflow_bytes', 20480);
+        $did = null;
+
+        foreach ($fields as $path => $field) {
+            if (! RecordSize::exceeds(['$type' => $this->lexicon()] + $data, $field->overflowThreshold ?? $default)) {
+                continue;
+            }
+
+            $value = Arr::get($data, $path);
+
+            if ($value === null) {
+                continue;
+            }
+
+            // INFO: resolved lazily and once. A model with no repo stays inline
+            // rather than failing, which is the shape it already had.
+            $did ??= ModelDid::for($model, $model->getAttribute($this->uriColumn()));
+
+            if ($did === null) {
+                continue;
+            }
+
+            $blob = app(BlobManager::class)->uploadFromContent(
+                $did,
+                (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                $field->overflowMimeType,
+            );
+
+            Arr::forget($data, $path);
+            Arr::set($data, $field->overflowBlobPath, $blob->toArray());
+
+            if ($field->overflowReferencesPath !== null) {
+                $references = BlobReferences::collect($value);
+
+                if ($references !== []) {
+                    Arr::set($data, $field->overflowReferencesPath, $references);
+                }
+            }
+        }
+
+        return $data;
     }
 
     public function updateModel(Model $model, Data $record, array $meta = []): Model

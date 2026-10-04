@@ -143,6 +143,26 @@ class FieldMap
         return $paths;
     }
 
+    /**
+     * Fields declaring a blob overflow, keyed by the record path they write.
+     *
+     * @return array<string, Field>
+     */
+    public function overflowFields(): array
+    {
+        $fields = [];
+
+        foreach ($this->fields as $path => $field) {
+            $field = $this->normalise($field);
+
+            if ($field->overflows()) {
+                $fields[$path] = $field;
+            }
+        }
+
+        return $fields;
+    }
+
     protected function decode(Field $field, mixed $raw, object $record): mixed
     {
         if ($field->getter !== null) {

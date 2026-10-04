@@ -104,6 +104,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Records
+    |--------------------------------------------------------------------------
+    |
+    | `overflow_bytes` is the encoded record size past which a field declaring
+    | `overflowsToBlob()` stops being written inline. A policy choice well below
+    | the 1 MiB ceiling (MAX_CBOR_RECORD_SIZE), not the limit itself.
+    |
+    */
+
+    'records' => [
+        'overflow_bytes' => (int) env('PARITY_RECORD_OVERFLOW_BYTES', 20480),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sync Configuration
     |--------------------------------------------------------------------------
     |
