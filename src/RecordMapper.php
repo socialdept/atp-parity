@@ -19,6 +19,7 @@ use SocialDept\AtpParity\Support\RecordSize;
 use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
+use Throwable;
 
 /**
  * Abstract base class for bidirectional Record <-> Model mapping.
@@ -331,6 +332,67 @@ abstract class RecordMapper implements RecordMapperContract
         return $data;
     }
 
+    /**
+     * Put an overflowed field back inline before anything reads the record.
+     *
+     * The inverse of {@see self::applyOverflow()}. A record whose content sits in
+     * a blob carries no inline value, so a gate or a mapper inspecting it sees an
+     * empty document and refuses perfectly good content.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function resolveOverflow(Data $record, array $meta): Data
+    {
+        $fields = $this->fieldMap()->overflowFields();
+        $did = $meta['did'] ?? null;
+
+        if ($fields === [] || ! is_string($did)) {
+            return $record;
+        }
+
+        $data = $record->toArray();
+        $restored = false;
+
+        foreach ($fields as $path => $field) {
+            $blob = Arr::get($data, (string) $field->overflowBlobPath);
+
+            // An inline value already present wins: it is the one the author wrote.
+            if (! is_array($blob) || Arr::get($data, $path) !== null) {
+                continue;
+            }
+
+            try {
+                $decoded = json_decode(
+                    app(BlobManager::class)->downloadContent(BlobReference::fromArray($blob), $did),
+                    associative: true,
+                    flags: JSON_THROW_ON_ERROR,
+                );
+            } catch (Throwable $e) {
+                // Leave it overflowed rather than half-read. A caller deciding
+                // whether to import needs "could not read" to differ from "empty".
+                Log::warning('Could not resolve an overflowed field from its blob', [
+                    'lexicon' => $this->lexicon(),
+                    'path' => $path,
+                    'uri' => $meta['uri'] ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            Arr::set($data, $path, $decoded);
+            Arr::forget($data, (string) $field->overflowBlobPath);
+
+            if ($field->overflowReferencesPath !== null) {
+                Arr::forget($data, $field->overflowReferencesPath);
+            }
+
+            $restored = true;
+        }
+
+        return $restored ? $this->recordClass()::fromArray($data) : $record;
+    }
+
     public function updateModel(Model $model, Data $record, array $meta = []): Model
     {
         $model->fill($this->applyMeta($this->recordToAttributes($record), $meta));
@@ -384,6 +446,8 @@ abstract class RecordMapper implements RecordMapperContract
 
     public function upsert(Data $record, array $meta = []): ?Model
     {
+        $record = $this->resolveOverflow($record, $meta);
+
         $uri = $meta['uri'] ?? null;
         $existing = $uri ? $this->findByUri($uri) : null;
 

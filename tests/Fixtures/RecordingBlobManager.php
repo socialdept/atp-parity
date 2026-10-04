@@ -24,14 +24,28 @@ class RecordingBlobManager extends BlobManager
         // Deliberately does not call the parent: nothing here touches storage.
     }
 
+    /** Content keyed by CID, for downloads. */
+    public array $stored = [];
+
+    /** When set, a download throws instead of returning. */
+    public ?string $downloadFailure = null;
+
+    public function downloadContent(BlobReference $blob, string $did): string
+    {
+        if ($this->downloadFailure !== null) {
+            throw new \RuntimeException($this->downloadFailure);
+        }
+
+        return $this->stored[$blob->ref] ?? throw new \RuntimeException('No blob stored for '.$blob->ref);
+    }
+
     public function uploadFromContent(string $did, string $content, string $mimeType): BlobReference
     {
         $this->uploads[] = ['did' => $did, 'content' => $content, 'mimeType' => $mimeType];
 
-        return new BlobReference(
-            ref: self::CIDS[(count($this->uploads) - 1) % count(self::CIDS)],
-            mimeType: $mimeType,
-            size: strlen($content),
-        );
+        $cid = self::CIDS[(count($this->uploads) - 1) % count(self::CIDS)];
+        $this->stored[$cid] = $content;
+
+        return new BlobReference(ref: $cid, mimeType: $mimeType, size: strlen($content));
     }
 }
