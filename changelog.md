@@ -2,6 +2,93 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.1.0
+
+### Added
+- **A field can overflow to a blob.** `Field::overflowsToBlob()` declares where a
+  field's value goes once the encoded record exceeds a threshold, and the record is
+  read back the same way on import. A record has a hard ceiling of 1 MiB
+  (`MAX_CBOR_RECORD_SIZE`) and the guidance is to stay within a few dozen KBytes, which
+  a mapper could not honour on its own: it has no way to know how large the record it
+  contributes to has become.
+
+  Opt in. A field that does not declare it never touches the blob path, and a mapper
+  declaring none behaves exactly as before. `PARITY_RECORD_OVERFLOW_BYTES` sets the
+  default threshold.
+
+  Pass `references` wherever the value can contain blobs. A PDS collects a blob no
+  record references, and a blob nested inside overflowed content is invisible to it,
+  so a long record loses its images some time after the write with nothing at the time
+  to show for it. `BlobReferences::collect()` gathers the full blob objects,
+  deduplicated and ordered by CID so the same content always produces the same record.
+
+- **`RecordSize`**, the dag-cbor byte size of a record as a PDS stores it, including
+  the `$type` a server adds before hashing. Measuring the JSON form a record travels in
+  counts a link as a map of one string and overstates every record carrying blobs,
+  which is the class of record whose size decides anything.
+
+- **`RecordMapper::withoutOverflow()`**, for callers measuring the inline size. Without
+  it, every size check would upload a blob and no record could read as over the limit.
+
+- **`DataModel`**, the JSON-form to data-model conversion extracted from `RecordCid` so
+  hashing and measuring agree on what a record is. `RecordCid` behaviour is unchanged.
+
+### Fixed
+- **A declared date field decoded to an array.** `FieldMap::plain()` called `toArray()`
+  on any object, and Carbon's returns the date parts rather than a date, so the value
+  reached a date cast as an array and threw. A `DateTimeInterface` now passes through.
+
+## v1.0.1
+
+### Fixed
+- **The skip-unchanged guard was inert on the 1.0 line.** The same defect fixed in
+  v0.6.2: `SyncService` and `ReferenceSyncService` hashed `Data::toArray()`, which omits
+  the top-level `$type`. A PDS adds `$type` itself before hashing, so a stored CID is
+  always the address of the `$type`-bearing record and the comparison could not match
+  for any record ever written. v1.0.0 branched without the v0.6.2 fix and so shipped
+  with the guard disabled, which means every resync wrote. Both guards now hash
+  `Data::toRecord()`.
+
+  **Anyone on v1.0.0 should move to this release.** The guard there does nothing.
+
+### Added
+- **`$force` on the sync-or-create path.** `syncWithReference()`, `syncReferenceOnly()`
+  and `syncAsWithMapper()` take `bool $force = false` and thread it to the `resync*`
+  call they delegate to for an already-synced model. Operator-facing surfaces call
+  these rather than a `resync*`, so with the guard working a Resync pressed on a
+  byte-identical record would report success and write nothing.
+
+  Every new parameter defaults to false, which is the previous behaviour.
+
+## v1.0.0
+
+A mapper declares its fields instead of writing both directions, an ingest boundary
+refuses what it has not allowed, records of older shapes are brought forward before
+anything reads them, and blob uploads leave record construction.
+
+**See UPGRADING.md. Three changes need action.**
+
+### Changed
+- **A mapper imports nothing until it declares `accepts()`.** Ingest is default deny. A
+  mapper that overrides `shouldImport()` itself is unaffected, which is most existing
+  mappers.
+- **`SchemaMapper` takes an acceptance argument.**
+- **Protocol metadata is written with `setAttribute()` rather than filled**, so a model
+  with a real `$fillable` no longer silently loses its `uri` and `cid`. If you override
+  `applyMeta()`, the metadata columns moved to `applyMetaColumns()`, and calling
+  `parent::applyMeta()` still works.
+
+### Added
+- **`fields()` declarations.** A mapper returns a map of record path to `Field` and the
+  package derives both directions from it, rather than two hand-written halves that
+  nothing checks agree. Brings `Field`, `RecordCodec`, and `recordColumns()` with the
+  resync gate it enables: a save only pushes when a column the record depends on changed.
+- **`Acceptance`**, with `connectedActors()` and `knownActors()`.
+- **Record upcasting**, so a record written in an older shape is brought forward before
+  anything reads it.
+- **`AssertsRecordParity`** test assertions.
+- **Blob resolution before construction**, so record construction stays free of I/O.
+
 ## v0.6.2
 
 ### Fixed
@@ -24,6 +111,36 @@ All notable changes to `atp-parity` will be documented in this file.
   model. Operator-facing surfaces call these rather than a `resync*`, so a force
   that stopped at the resync methods could not be reached from the one place a
   human presses "Resync". Default `false`, so existing callers are unchanged.
+
+## v0.6.1
+
+### Fixed
+- **`resyncWithReference()` ignored `$force`.** v0.6.0 added the flag to `resync()`,
+  `resyncWithMapper()` and `resyncReference()`, but not to the combined entry point a
+  repair tool uses for a model carrying a reference record. A forced resync of such a
+  model skipped both writes whenever the repo already held them, which is exactly the
+  case a repair is pressed for.
+
+## v0.6.0
+
+### Added
+- **A resync skips the write when the repo already holds the record byte for byte.**
+  The CID the record would have is compared against the stored `atp_cid` and the
+  `putRecord` is skipped when they match, so a sync wired to model saves no longer
+  writes unchanged records into an author's repo.
+
+  Additive and backwards compatible:
+  - `SyncResult` gains an `unchanged` flag and an `unchanged()` constructor. It reports
+    success, so callers checking `isSuccess()` need no change.
+  - `resync()`, `resyncWithMapper()` and `resyncReference()` gain an optional `$force`.
+  - `PARITY_SYNC_SKIP_UNCHANGED` disables the comparison from env.
+
+  The guard did not actually fire until v0.6.2 on this line, and until v1.0.1 on the
+  1.0 line. See those entries.
+
+### Changed
+- **Declares `socialdept/atp-cbor` directly**, which until now was reached only through
+  `atp-signals`.
 
 ## v0.5.0
 

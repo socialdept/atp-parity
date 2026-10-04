@@ -2,6 +2,7 @@
 
 namespace SocialDept\AtpParity\Tests\Unit\Fields;
 
+use Carbon\Carbon;
 use SocialDept\AtpParity\Fields\Field;
 use SocialDept\AtpParity\Tests\Fixtures\DeclarativeMapper;
 use SocialDept\AtpParity\Tests\Fixtures\DeclaredRecord;
@@ -37,6 +38,19 @@ class DeclarativeMapperTest extends TestCase
             'payload' => 'ABC',
             'seenAt' => '2026-01-01T00:00:00Z',
         ], $overrides));
+    }
+
+    /**
+     * Carbon's toArray() returns date parts, so decoding one as a structure
+     * reaches a date cast as an array and throws.
+     */
+    public function test_a_date_on_a_record_survives_the_import(): void
+    {
+        $record = new DeclaredRecord(text: 'hello', seenAt: Carbon::parse('2026-05-25T00:00:00Z'));
+
+        $model = $this->mapper->toModel($record);
+
+        $this->assertInstanceOf(\DateTimeInterface::class, $model->seen_at);
     }
 
     public function test_it_imports_a_plain_column_and_a_nested_path(): void

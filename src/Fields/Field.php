@@ -39,6 +39,17 @@ class Field
 
     public bool $importOnly = false;
 
+    /** Where the blob goes when this field's value overflows, as a record path. */
+    public ?string $overflowBlobPath = null;
+
+    /** Where the blobs found inside an overflowed value are re-listed. */
+    public ?string $overflowReferencesPath = null;
+
+    /** Encoded record size past which this field overflows, or null for the configured default. */
+    public ?int $overflowThreshold = null;
+
+    public string $overflowMimeType = 'text/plain';
+
     /**
      * Columns a closure reads beyond the one this field writes.
      *
@@ -161,6 +172,35 @@ class Field
         $this->importOnly = $importOnly;
 
         return $this;
+    }
+
+    /**
+     * Write this field's value to a blob once the encoded record exceeds the threshold.
+     *
+     * A PDS sweeps blobs no record references, and blobs inside an overflowed
+     * value are invisible to it, so `$references` re-lists them.
+     *
+     * @param  string  $blob  record path the blob is written to
+     * @param  string|null  $references  record path the contained blobs are re-listed at
+     * @param  int|null  $threshold  encoded bytes past which to overflow, or null for the configured default
+     */
+    public function overflowsToBlob(
+        string $blob,
+        ?string $references = null,
+        ?int $threshold = null,
+        string $mimeType = 'text/plain',
+    ): static {
+        $this->overflowBlobPath = $blob;
+        $this->overflowReferencesPath = $references;
+        $this->overflowThreshold = $threshold;
+        $this->overflowMimeType = $mimeType;
+
+        return $this;
+    }
+
+    public function overflows(): bool
+    {
+        return $this->overflowBlobPath !== null;
     }
 
     /** A field with no column has nowhere to import into, so it can only be written. */

@@ -11,7 +11,7 @@ class DeclaredRecord extends Data
         public readonly ?object $nested = null,
         public readonly ?string $payload = null,
         public readonly ?string $derived = null,
-        public readonly ?string $seenAt = null,
+        public readonly string|\DateTimeInterface|null $seenAt = null,
     ) {
     }
 

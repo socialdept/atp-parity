@@ -135,7 +135,31 @@ public function fields(): array
 
 A field is built with `Field::for($column)`, or `Field::derived($closure)` when it has
 no column and is written only. Everything else chains: `get()`, `set()`, `default()`,
-`codec()`, `enum()`, `lossy()`, `blob()`, `importOnly()`.
+`codec()`, `enum()`, `lossy()`, `blob()`, `importOnly()`, `overflowsToBlob()`.
+
+#### Overflowing a large field to a blob
+
+A record has a hard ceiling of 1 MiB, and the guidance is to keep records within a few
+dozen KBytes and use a blob beyond that. A field holding something open ended, such as
+a document body, can declare where to put it once the record no longer fits:
+
+```php
+'content.items' => Field::derived(fn ($model) => $model->blocks())
+    ->overflowsToBlob(
+        blob: 'content.blob',
+        references: 'content.references',
+    ),
+```
+
+Under the threshold the field is written inline as usual. Over it, the value is
+uploaded as a blob, the inline path is dropped, and the record is read back the same
+way on import. This is opt in: a field that does not declare it is never touched.
+
+Pass `references` wherever the value can contain blobs. A PDS collects a blob that no
+record references, and a blob nested inside overflowed content is invisible to it, so
+the images in a long record are swept unless the record keeps naming them.
+
+`PARITY_RECORD_OVERFLOW_BYTES` sets the default threshold, and a field may override it.
 
 Where a translation does not fit a declaration, override `recordToAttributes()` or
 `modelToRecordData()` instead. That is still supported and is the right choice for
