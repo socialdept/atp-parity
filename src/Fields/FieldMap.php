@@ -3,6 +3,7 @@
 namespace SocialDept\AtpParity\Fields;
 
 use BackedEnum;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordCodec;
 
@@ -236,6 +237,12 @@ class FieldMap
      */
     protected function plain(mixed $value): mixed
     {
+        // FIX: a date is a value, not a structure. Carbon's toArray() returns its
+        // date parts, which reaches a date cast as an array and throws.
+        if ($value instanceof DateTimeInterface) {
+            return $value;
+        }
+
         if (is_object($value) && method_exists($value, 'toArray')) {
             return $value->toArray();
         }
