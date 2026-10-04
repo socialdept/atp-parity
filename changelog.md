@@ -2,6 +2,42 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.1.0
+
+### Added
+- **A field can overflow to a blob.** `Field::overflowsToBlob()` declares where a
+  field's value goes once the encoded record exceeds a threshold, and the record is
+  read back the same way on import. A record has a hard ceiling of 1 MiB
+  (`MAX_CBOR_RECORD_SIZE`) and the guidance is to stay within a few dozen KBytes, which
+  a mapper could not honour on its own: it has no way to know how large the record it
+  contributes to has become.
+
+  Opt in. A field that does not declare it never touches the blob path, and a mapper
+  declaring none behaves exactly as before. `PARITY_RECORD_OVERFLOW_BYTES` sets the
+  default threshold.
+
+  Pass `references` wherever the value can contain blobs. A PDS collects a blob no
+  record references, and a blob nested inside overflowed content is invisible to it,
+  so a long record loses its images some time after the write with nothing at the time
+  to show for it. `BlobReferences::collect()` gathers the full blob objects,
+  deduplicated and ordered by CID so the same content always produces the same record.
+
+- **`RecordSize`**, the dag-cbor byte size of a record as a PDS stores it, including
+  the `$type` a server adds before hashing. Measuring the JSON form a record travels in
+  counts a link as a map of one string and overstates every record carrying blobs,
+  which is the class of record whose size decides anything.
+
+- **`RecordMapper::withoutOverflow()`**, for callers measuring the inline size. Without
+  it, every size check would upload a blob and no record could read as over the limit.
+
+- **`DataModel`**, the JSON-form to data-model conversion extracted from `RecordCid` so
+  hashing and measuring agree on what a record is. `RecordCid` behaviour is unchanged.
+
+### Fixed
+- **A declared date field decoded to an array.** `FieldMap::plain()` called `toArray()`
+  on any object, and Carbon's returns the date parts rather than a date, so the value
+  reached a date cast as an array and threw. A `DateTimeInterface` now passes through.
+
 ## v0.6.2
 
 ### Fixed
