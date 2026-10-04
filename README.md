@@ -161,6 +161,50 @@ the images in a long record are swept unless the record keeps naming them.
 
 `PARITY_RECORD_OVERFLOW_BYTES` sets the default threshold, and a field may override it.
 
+The lexicon has to accept both shapes. Adding the two properties to an existing content
+object is backwards compatible, since a reader that knows only `items` keeps working on
+every record written so far:
+
+```json
+{
+  "lexicon": 1,
+  "id": "com.example.content",
+  "defs": {
+    "main": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "type": "union", "refs": [], "closed": false },
+          "description": "Content blocks, written inline while the record fits"
+        },
+        "blob": {
+          "type": "blob",
+          "accept": ["application/json"],
+          "maxSize": 5242880,
+          "description": "The same content as JSON, written here instead of inline once the record is too large"
+        },
+        "references": {
+          "type": "array",
+          "items": { "type": "blob" },
+          "description": "Every blob the content refers to, re-listed so a PDS does not collect them while the content sits in a blob"
+        }
+      }
+    }
+  }
+}
+```
+
+Three things to get right:
+
+- **The inline property cannot stay required.** An overflowed record does not carry it,
+  so a lexicon demanding `items` rejects exactly the records this feature produces.
+- **`accept` must match the field's mime type.** The default is `text/plain`, so a
+  lexicon accepting only `application/json` needs
+  `overflowsToBlob(..., mimeType: 'application/json')` to agree with it.
+- **`maxSize` bounds the overflow, not the record.** It is the ceiling on how much
+  content a blob may hold, well above the record threshold rather than near it.
+
 Where a translation does not fit a declaration, override `recordToAttributes()` or
 `modelToRecordData()` instead. That is still supported and is the right choice for
 something like rich text.
