@@ -189,7 +189,8 @@ return [
         ],
 
         // Rollback strategy when reference sync fails after main succeeds
-        // true: Delete main record if reference fails (atomic behavior)
+        // true: Delete main record if reference fails (atomic behavior). Only a main
+        //       record the same sync created is deleted, never one that already existed
         // false: Keep main record even if reference fails (partial sync allowed)
         'rollback_on_failure' => true,
     ],

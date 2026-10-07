@@ -54,6 +54,11 @@ class ReferenceSyncService
             );
         }
 
+        // INFO: only a main record this call created may be rolled back. One that
+        // already existed is live content, and a failed reference is no reason to
+        // delete it.
+        $mainExisted = (bool) $this->getMainUri($model);
+
         // Step 1: Sync main record using the main mapper
         $mainResult = $this->syncService->syncAsWithMapper($did, $model, $mainMapper, $force);
 
@@ -64,7 +69,7 @@ class ReferenceSyncService
         // Step 2: Create reference record
         $referenceResult = $this->syncReferenceOnly($did, $model, $referenceMapper, $force);
 
-        if ($referenceResult->isFailed() && $rollbackOnFailure) {
+        if ($referenceResult->isFailed() && $rollbackOnFailure && ! $mainExisted) {
             // Rollback: delete the main record
             $this->syncService->unsync($model);
 
