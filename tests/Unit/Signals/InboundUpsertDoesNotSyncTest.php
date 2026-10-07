@@ -13,6 +13,7 @@ use SocialDept\AtpParity\Tests\Fixtures\AutoSyncModel;
 use SocialDept\AtpParity\Tests\Fixtures\AutoSyncReferenceModel;
 use SocialDept\AtpParity\Tests\Fixtures\PublishingMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestMainMapper;
+use SocialDept\AtpParity\Tests\Fixtures\TestMainRecord;
 use SocialDept\AtpParity\Tests\Fixtures\TestRecord;
 use SocialDept\AtpParity\Tests\Fixtures\TestReferenceMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestReferenceRecord;
@@ -61,6 +62,12 @@ class InboundUpsertDoesNotSyncTest extends TestCase
                 $this->outbound[] = 'reference';
 
                 return ReferenceSyncResult::failed('should not be reached');
+            });
+        $references->shouldReceive('resyncReference')
+            ->andReturnUsing(function () {
+                $this->outbound[] = 'repoint';
+
+                return SyncResult::success('at://did:plc:test/app.test.reference/ref1', 'bafyreirepointed');
             });
         $this->app->instance(ReferenceSyncService::class, $references);
 
@@ -168,6 +175,45 @@ class InboundUpsertDoesNotSyncTest extends TestCase
 
         $this->assertSame([], $this->outbound);
         $this->assertSame('bafyreinew', AutoSyncReferenceModel::first()->atp_reference_cid);
+    }
+
+    /**
+     * A reference record holds the main record's CID, so a main record that changed
+     * remotely leaves it pointing at the old version. Suppressing every write stranded
+     * it there. Only the reference may move: the main record is already in the repo.
+     */
+    public function test_an_inbound_main_record_repoints_only_its_reference(): void
+    {
+        $registry = app(MapperRegistry::class);
+        $registry->register($main = new class () extends TestMainMapper {
+            public function modelClass(): string
+            {
+                return AutoSyncReferenceModel::class;
+            }
+        });
+        $registry->register(new class () extends TestReferenceMapper {
+            public function modelClass(): string
+            {
+                return AutoSyncReferenceModel::class;
+            }
+        });
+
+        AutoSyncReferenceModel::create([
+            'title' => 'Before',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreimain',
+            'atp_reference_uri' => 'at://did:plc:test/app.test.reference/ref1',
+            'atp_reference_cid' => 'bafyreiref',
+        ]);
+        $this->outbound = [];
+
+        $main->upsert(
+            TestMainRecord::fromArray(['title' => 'Edited remotely']),
+            ['uri' => 'at://did:plc:test/app.test.main/abc', 'cid' => 'bafyreiedited', 'did' => 'did:plc:test'],
+        );
+
+        $this->assertSame(['repoint'], $this->outbound);
+        $this->assertSame('Edited remotely', AutoSyncReferenceModel::first()->title);
     }
 
     /**

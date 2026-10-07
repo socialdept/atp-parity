@@ -12,6 +12,9 @@ All notable changes to `atp-parity` will be documented in this file.
   second write, and a genuine remote edit was overwritten with stale content, then
   written again by anything `afterUpsert()` saved. Every inbound path now runs inside
   `AutoSync::without()`, `afterUpsert()` included.
+  The one write that still happens is the model's own reference record: a main record
+  that changed remotely is followed by a resync of its reference alone, so the StrongRef
+  points at the new CID. Its unchanged guard skips the write when the CID did not move.
 
 - **A returned CID could fail to reach the row.** The metadata writers set attributes
   and saved, and a save writes only what differs from the instance's original. A stale

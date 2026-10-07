@@ -18,6 +18,7 @@ use SocialDept\AtpParity\Support\BlobCid;
 use SocialDept\AtpParity\Support\BlobReferences;
 use SocialDept\AtpParity\Support\ModelDid;
 use SocialDept\AtpParity\Support\RecordSize;
+use SocialDept\AtpParity\Sync\ReferenceSyncService;
 use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
@@ -477,7 +478,7 @@ abstract class RecordMapper implements RecordMapperContract
         // INFO: applying the record, afterUpsert() included, is one inbound write. A
         // save in here that auto-synced would write the record back to the repo it
         // came from, and before afterUpsert() runs it would write stale content.
-        return AutoSync::without(function () use ($record, $meta): ?Model {
+        $model = AutoSync::without(function () use ($record, $meta): ?Model {
             $record = $this->resolveOverflow($record, $meta);
 
             $uri = $meta['uri'] ?? null;
@@ -514,6 +515,56 @@ abstract class RecordMapper implements RecordMapperContract
 
             return $model;
         });
+
+        if ($model) {
+            $this->repointReference($model);
+        }
+
+        return $model;
+    }
+
+    /**
+     * Point the model's own reference record at the main record that just arrived.
+     *
+     * The main record is never written back: the repo already holds it. A reference
+     * record carries the main record's CID in a StrongRef, though, so a main record
+     * that changed remotely leaves the reference pointing at the old version. Only the
+     * reference is resynced, and its unchanged guard skips the write when the CID did
+     * not move, so an echo of our own write costs nothing.
+     */
+    protected function repointReference(Model $model): void
+    {
+        if (! method_exists($model, 'getReferenceMapper') || ! method_exists($model, 'isFullySynced') || ! $model->isFullySynced()) {
+            return;
+        }
+
+        if (method_exists($model, 'shouldAutoSyncReference') && ! $model->shouldAutoSyncReference()) {
+            return;
+        }
+
+        $referenceMapper = $model->getReferenceMapper();
+
+        if (! $referenceMapper || $referenceMapper->mainLexicon() !== $this->lexicon()) {
+            return;
+        }
+
+        try {
+            $result = app(ReferenceSyncService::class)->resyncReference($model, $referenceMapper);
+
+            if ($result->isFailed()) {
+                Log::warning('[Parity] Could not repoint the reference record after an inbound update', [
+                    'model' => $model::class,
+                    'key' => $model->getKey(),
+                    'error' => $result->error,
+                ]);
+            }
+        } catch (Throwable $e) {
+            Log::warning('[Parity] Could not repoint the reference record after an inbound update', [
+                'model' => $model::class,
+                'key' => $model->getKey(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
