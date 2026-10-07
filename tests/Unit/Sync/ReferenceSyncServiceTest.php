@@ -133,6 +133,50 @@ class ReferenceSyncServiceTest extends TestCase
         $this->assertStringContainsString('rolled back', $result->error);
     }
 
+    /**
+     * Rollback undoes a main record this sync just created. One that already
+     * existed is live content: a failed reference used to delete it anyway, taking
+     * a published record off the network because its pointer could not be written.
+     */
+    public function test_a_failed_reference_never_rolls_back_a_main_record_that_already_existed(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Published',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+        ]);
+
+        $mainResponse = new \stdClass();
+        $mainResponse->uri = 'at://did:plc:test/app.test.main/abc';
+        $mainResponse->cid = 'bafyreiMainUpdated';
+
+        $repoClient = Mockery::mock();
+        $repoClient->shouldReceive('putRecord')->andReturn($mainResponse);
+        $repoClient->shouldReceive('createRecord')->once()->andThrow(new \Exception('Reference creation failed'));
+        $repoClient->shouldReceive('deleteRecord')->never();
+
+        $atprotoClient = Mockery::mock();
+        $atprotoClient->repo = $repoClient;
+
+        $atpClient = Mockery::mock();
+        $atpClient->atproto = $atprotoClient;
+
+        $manager = Mockery::mock();
+        $manager->shouldReceive('as')->andReturn($atpClient);
+
+        $this->app->instance('atp-client', $manager);
+
+        $result = $this->service->syncWithReference(
+            'did:plc:test',
+            $model,
+            $this->referenceMapper,
+            rollbackOnFailure: true
+        );
+
+        $this->assertTrue($result->hasReferenceFailure());
+        $this->assertSame('at://did:plc:test/app.test.main/abc', $model->fresh()->atp_uri);
+    }
+
     public function test_sync_with_reference_keeps_main_when_rollback_disabled(): void
     {
         $model = ReferenceModel::create(['title' => 'Test']);

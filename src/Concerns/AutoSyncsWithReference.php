@@ -8,6 +8,7 @@ use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
 use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Enums\PendingSyncOperation;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
+use SocialDept\AtpParity\Support\AutoSync;
 use SocialDept\AtpParity\Sync\ReferenceSyncService;
 
 /**
@@ -18,6 +19,9 @@ use SocialDept\AtpParity\Sync\ReferenceSyncService;
  *
  * Use this instead of AutoSyncsWithAtp when your model needs both
  * a main record (third-party lexicon) and a reference record (your lexicon).
+ *
+ * Nothing syncs inside {@see AutoSync::without()}, which is where every inbound
+ * record is applied.
  *
  * @mixin \Illuminate\Database\Eloquent\Model
  */
@@ -31,6 +35,10 @@ trait AutoSyncsWithReference
     public static function bootAutoSyncsWithReference(): void
     {
         static::created(function ($model) {
+            if (AutoSync::isSuppressed()) {
+                return;
+            }
+
             if ($model->shouldAutoSyncReference()) {
                 $did = $model->syncAsDid();
                 $mapper = $model->getReferenceMapper();
@@ -62,6 +70,10 @@ trait AutoSyncsWithReference
         });
 
         static::updated(function ($model) {
+            if (AutoSync::isSuppressed()) {
+                return;
+            }
+
             if ($model->isFullySynced() && $model->shouldAutoSyncReference()) {
                 $mapper = $model->getReferenceMapper();
 
@@ -101,6 +113,10 @@ trait AutoSyncsWithReference
         });
 
         static::deleted(function ($model) {
+            if (AutoSync::isSuppressed()) {
+                return;
+            }
+
             if ($model->shouldAutoUnsyncReference()) {
                 $mapper = $model->getReferenceMapper();
 

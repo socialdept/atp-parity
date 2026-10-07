@@ -1,5 +1,24 @@
 # Upgrading
 
+## 1.1.0 to 1.1.1
+
+Nothing needs action. Four behaviors change, each toward writing less:
+
+- **Applying an inbound record no longer auto-syncs.** A save made while a record is
+  upserted, including in a mapper's `afterUpsert()`, is not written back to the repo.
+  Code that relied on an inbound record triggering an outbound write (none should) has
+  to sync explicitly. `AutoSync::without()` is the new scope that does this.
+- **A failed reference no longer rolls back a main record that already existed.** With
+  `references.rollback_on_failure`, only a main record the same `syncWithReference()`
+  call created is deleted. Otherwise the result is a reference failure, as it is with
+  rollback disabled.
+- **Protocol metadata is written with a direct update.** The uri, cid and synced-at
+  columns (and the reference pair) are written by key rather than through a save that
+  could skip a value equal to the instance's original. No model events fire, as before,
+  and `updated_at` moves exactly when it used to.
+- **A resync of an overflowing record decides before uploading.** The unchanged-write
+  guard checks a draft whose blob is addressed locally, and only a write uploads.
+
 ## 0.6 to 1.0
 
 Two changes need action. Everything else is additive, and an existing mapper that

@@ -91,6 +91,28 @@ public function shouldAutoUnsync(): bool
 }
 ```
 
+## Inbound Records Do Not Sync
+
+A record arriving from the network is applied with a model save, which is exactly what
+these traits listen for. Every inbound path therefore runs inside `AutoSync::without()`:
+`ParitySignal`, the importer, deferred reference replay, and `RecordMapper::upsert()`
+itself, including the mapper's `afterUpsert()` hook. Anything that hook saves mirrors
+the repo, so none of it is written back out.
+
+The scope is available to your own code for the same purpose:
+
+```php
+use SocialDept\AtpParity\Support\AutoSync;
+
+AutoSync::without(function () use ($post, $record) {
+    $post->update(['content' => $record->text]);
+});
+```
+
+It suppresses `created`, `updated` and `deleted` syncing for both `AutoSyncsWithAtp`
+and `AutoSyncsWithReference`, nests safely, and ends when the callback returns or
+throws.
+
 ## Events
 
 The following events are dispatched during sync operations:

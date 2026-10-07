@@ -9,6 +9,8 @@ use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\RecordUnsynced;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\RecordMapper as AbstractRecordMapper;
+use SocialDept\AtpParity\Support\MetaColumns;
 use SocialDept\AtpParity\Support\RecordCid;
 use Throwable;
 
@@ -129,6 +131,16 @@ class SyncService
         }
 
         try {
+            // A record whose content overflows to a blob is decided before the
+            // blob is uploaded, so a skipped write uploads nothing.
+            if (! $force && $this->overflows($mapper)) {
+                $draft = AbstractRecordMapper::withoutOverflowUploads(fn () => $mapper->toRecord($model));
+
+                if ($unchanged = $this->alreadyInRepo($model, $draft->toRecord())) {
+                    return SyncResult::unchanged($uri, $unchanged);
+                }
+            }
+
             $record = $mapper->toRecord($model);
 
             // INFO: hash `toRecord()`, not `toArray()`. A PDS adds the top-level
@@ -275,6 +287,14 @@ class SyncService
     }
 
     /**
+     * Whether this mapper can move content into a blob while building a record.
+     */
+    protected function overflows(\SocialDept\AtpParity\Contracts\RecordMapper $mapper): bool
+    {
+        return $mapper instanceof AbstractRecordMapper && $mapper->fieldMap()->overflowFields() !== [];
+    }
+
+    /**
      * Update model with AT Protocol metadata.
      */
     protected function updateModelMeta(Model $model, string $uri, string $cid): void
@@ -283,10 +303,11 @@ class SyncService
         $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
         $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
-        $model->{$uriColumn} = $uri;
-        $model->{$cidColumn} = $cid;
-        $model->{$syncedAtColumn} = now();
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $uriColumn => $uri,
+            $cidColumn => $cid,
+            $syncedAtColumn => now(),
+        ]);
     }
 
     /**
@@ -298,10 +319,11 @@ class SyncService
         $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
         $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
-        $model->{$uriColumn} = null;
-        $model->{$cidColumn} = null;
-        $model->{$syncedAtColumn} = null;
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $uriColumn => null,
+            $cidColumn => null,
+            $syncedAtColumn => null,
+        ]);
     }
 
     /**

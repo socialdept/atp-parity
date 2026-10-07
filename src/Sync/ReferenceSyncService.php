@@ -11,6 +11,8 @@ use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\RecordMapper as AbstractRecordMapper;
+use SocialDept\AtpParity\Support\MetaColumns;
 use SocialDept\AtpParity\Support\RecordCid;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use Throwable;
@@ -53,6 +55,11 @@ class ReferenceSyncService
             );
         }
 
+        // INFO: only a main record this call created may be rolled back. One that
+        // already existed is live content, and a failed reference is no reason to
+        // delete it.
+        $mainExisted = (bool) $this->getMainUri($model);
+
         // Step 1: Sync main record using the main mapper
         $mainResult = $this->syncService->syncAsWithMapper($did, $model, $mainMapper, $force);
 
@@ -63,7 +70,7 @@ class ReferenceSyncService
         // Step 2: Create reference record
         $referenceResult = $this->syncReferenceOnly($did, $model, $referenceMapper, $force);
 
-        if ($referenceResult->isFailed() && $rollbackOnFailure) {
+        if ($referenceResult->isFailed() && $rollbackOnFailure && ! $mainExisted) {
             // Rollback: delete the main record
             $this->syncService->unsync($model);
 
@@ -234,6 +241,14 @@ class ReferenceSyncService
         }
 
         try {
+            if (! $force && $mapper instanceof AbstractRecordMapper && $mapper->fieldMap()->overflowFields() !== []) {
+                $draft = AbstractRecordMapper::withoutOverflowUploads(fn () => $mapper->toRecord($model));
+
+                if ($unchanged = $this->referenceAlreadyInRepo($model, $mapper, $draft->toRecord())) {
+                    return SyncResult::unchanged($uri, $unchanged);
+                }
+            }
+
             $record = $mapper->toRecord($model);
 
             // INFO: hash `toRecord()`, not `toArray()`. A PDS adds the top-level
@@ -359,11 +374,9 @@ class ReferenceSyncService
         $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
         $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
 
-        $model->{$uriColumn} = $ref->uri;
-        if ($ref->cid) {
-            $model->{$cidColumn} = $ref->cid;
-        }
-        $model->saveQuietly();
+        MetaColumns::write($model, $ref->cid
+            ? [$uriColumn => $ref->uri, $cidColumn => $ref->cid]
+            : [$uriColumn => $ref->uri]);
     }
 
     /**
@@ -402,9 +415,10 @@ class ReferenceSyncService
         string $uri,
         string $cid
     ): void {
-        $model->{$mapper->referenceUriColumn()} = $uri;
-        $model->{$mapper->referenceCidColumn()} = $cid;
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $mapper->referenceUriColumn() => $uri,
+            $mapper->referenceCidColumn() => $cid,
+        ]);
     }
 
     /**
@@ -412,9 +426,10 @@ class ReferenceSyncService
      */
     protected function clearReferenceModelMeta(Model $model, ReferenceMapper $mapper): void
     {
-        $model->{$mapper->referenceUriColumn()} = null;
-        $model->{$mapper->referenceCidColumn()} = null;
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $mapper->referenceUriColumn() => null,
+            $mapper->referenceCidColumn() => null,
+        ]);
     }
 
     /**

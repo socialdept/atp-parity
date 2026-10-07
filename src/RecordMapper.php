@@ -13,9 +13,12 @@ use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
 use SocialDept\AtpParity\Fields\FieldMap;
+use SocialDept\AtpParity\Support\AutoSync;
+use SocialDept\AtpParity\Support\BlobCid;
 use SocialDept\AtpParity\Support\BlobReferences;
 use SocialDept\AtpParity\Support\ModelDid;
 use SocialDept\AtpParity\Support\RecordSize;
+use SocialDept\AtpParity\Sync\ReferenceSyncService;
 use SocialDept\AtpParity\Upcasting\UpcasterChain;
 use SocialDept\AtpSchema\Data\BlobReference;
 use SocialDept\AtpSchema\Data\Data;
@@ -39,6 +42,8 @@ abstract class RecordMapper implements RecordMapperContract
     private ?FieldMap $fieldMap = null;
 
     protected static bool $overflowEnabled = true;
+
+    protected static bool $overflowUploads = true;
 
     /**
      * Get the Record class this mapper handles.
@@ -273,6 +278,30 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
+     * Build records whose overflow blobs are addressed locally instead of uploaded.
+     *
+     * A blob's CID is the hash of its bytes, so the record a write would produce
+     * can be built and hashed without a PDS. The sync services use this to decide
+     * whether a write is needed before uploading anything for it.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    public static function withoutOverflowUploads(callable $callback): mixed
+    {
+        $previous = static::$overflowUploads;
+        static::$overflowUploads = false;
+
+        try {
+            return $callback();
+        } finally {
+            static::$overflowUploads = $previous;
+        }
+    }
+
+    /**
      * Move declared fields into a blob once the record exceeds their threshold.
      *
      * Measured with the `$type` a PDS adds before it hashes, so the number is
@@ -311,11 +340,11 @@ abstract class RecordMapper implements RecordMapperContract
                 continue;
             }
 
-            $blob = app(BlobManager::class)->uploadFromContent(
-                $did,
-                (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-                $field->overflowMimeType,
-            );
+            $content = (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+            $blob = static::$overflowUploads
+                ? app(BlobManager::class)->uploadFromContent($did, $content, $field->overflowMimeType)
+                : new BlobReference(ref: BlobCid::for($content), mimeType: $field->overflowMimeType, size: strlen($content));
 
             Arr::forget($data, $path);
             Arr::set($data, $field->overflowBlobPath, $blob->toArray());
@@ -446,41 +475,96 @@ abstract class RecordMapper implements RecordMapperContract
 
     public function upsert(Data $record, array $meta = []): ?Model
     {
-        $record = $this->resolveOverflow($record, $meta);
+        // INFO: applying the record, afterUpsert() included, is one inbound write. A
+        // save in here that auto-synced would write the record back to the repo it
+        // came from, and before afterUpsert() runs it would write stale content.
+        $model = AutoSync::without(function () use ($record, $meta): ?Model {
+            $record = $this->resolveOverflow($record, $meta);
 
-        $uri = $meta['uri'] ?? null;
-        $existing = $uri ? $this->findByUri($uri) : null;
+            $uri = $meta['uri'] ?? null;
+            $existing = $uri ? $this->findByUri($uri) : null;
 
-        // Resolved before the gate and handed over in `$meta['existing']`, so a
-        // mapper can tell a create from an update without querying again — the
-        // same row was otherwise fetched three times per event. Passed through
-        // meta rather than a fourth parameter: changing the signature would
-        // break every mapper that overrides this, in every consuming app.
-        if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
-            return null;
-        }
-
-        if ($uri) {
-            if ($existing) {
-                $this->updateModel($existing, $record, $meta);
-                $existing->save();
-                $this->afterUpsert($existing, $record, $meta, created: false);
-
-                return $existing;
+            // Resolved before the gate and handed over in `$meta['existing']`, so a
+            // mapper can tell a create from an update without querying again — the
+            // same row was otherwise fetched three times per event. Passed through
+            // meta rather than a fourth parameter: changing the signature would
+            // break every mapper that overrides this, in every consuming app.
+            if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
+                return null;
             }
+
+            if ($uri) {
+                if ($existing) {
+                    $this->updateModel($existing, $record, $meta);
+                    $existing->save();
+                    $this->afterUpsert($existing, $record, $meta, created: false);
+
+                    return $existing;
+                }
+            }
+
+            $model = $this->toModel($record, $meta);
+            $model->save();
+
+            // A create is the only moment a parked reference becomes actionable: if
+            // the target had existed, the reference would have applied directly.
+            // Updates skip this entirely.
+            $this->replayDeferredReferences($model, $meta);
+
+            $this->afterUpsert($model, $record, $meta, created: true);
+
+            return $model;
+        });
+
+        if ($model) {
+            $this->repointReference($model);
         }
-
-        $model = $this->toModel($record, $meta);
-        $model->save();
-
-        // A create is the only moment a parked reference becomes actionable: if
-        // the target had existed, the reference would have applied directly.
-        // Updates skip this entirely.
-        $this->replayDeferredReferences($model, $meta);
-
-        $this->afterUpsert($model, $record, $meta, created: true);
 
         return $model;
+    }
+
+    /**
+     * Point the model's own reference record at the main record that just arrived.
+     *
+     * The main record is never written back: the repo already holds it. A reference
+     * record carries the main record's CID in a StrongRef, though, so a main record
+     * that changed remotely leaves the reference pointing at the old version. Only the
+     * reference is resynced, and its unchanged guard skips the write when the CID did
+     * not move, so an echo of our own write costs nothing.
+     */
+    protected function repointReference(Model $model): void
+    {
+        if (! method_exists($model, 'getReferenceMapper') || ! method_exists($model, 'isFullySynced') || ! $model->isFullySynced()) {
+            return;
+        }
+
+        if (method_exists($model, 'shouldAutoSyncReference') && ! $model->shouldAutoSyncReference()) {
+            return;
+        }
+
+        $referenceMapper = $model->getReferenceMapper();
+
+        if (! $referenceMapper || $referenceMapper->mainLexicon() !== $this->lexicon()) {
+            return;
+        }
+
+        try {
+            $result = app(ReferenceSyncService::class)->resyncReference($model, $referenceMapper);
+
+            if ($result->isFailed()) {
+                Log::warning('[Parity] Could not repoint the reference record after an inbound update', [
+                    'model' => $model::class,
+                    'key' => $model->getKey(),
+                    'error' => $result->error,
+                ]);
+            }
+        } catch (Throwable $e) {
+            Log::warning('[Parity] Could not repoint the reference record after an inbound update', [
+                'model' => $model::class,
+                'key' => $model->getKey(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -493,6 +577,9 @@ abstract class RecordMapper implements RecordMapperContract
      *
      * `$created` distinguishes the two cases that usually need different
      * handling: seeding initial state versus recording a subsequent change.
+     *
+     * Runs inside {@see AutoSync::without()}: whatever it saves mirrors the repo, so
+     * nothing it does is written back out.
      *
      * @param  array<string, mixed>  $meta
      */
