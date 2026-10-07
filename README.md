@@ -489,6 +489,17 @@ against the one already stored. Set `PARITY_SYNC_SKIP_UNCHANGED=false` to disabl
 pass `resync(force: true)` when repairing a repo, where an equal CID proves what was
 last written rather than what the repo still holds.
 
+Applying an inbound record never syncs. The signal, the importer and a mapper's
+`upsert()` (its `afterUpsert()` hook included) all run inside `AutoSync::without()`,
+so a record arriving from a repo is not written straight back to it. Wrap your own work
+in the same scope when it mirrors the repo rather than changing it:
+
+```php
+use SocialDept\AtpParity\Support\AutoSync;
+
+AutoSync::without(fn () => $post->update(['content' => $fromTheRepo]));
+```
+
 Failed syncs due to expired OAuth sessions can be captured and retried after re-authentication. See [Automatic Syncing](docs/auto-sync.md) for complete documentation including pending sync configuration.
 
 ## Database Migration

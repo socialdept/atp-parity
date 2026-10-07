@@ -2,6 +2,51 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.1.1
+
+### Fixed
+- **Applying an inbound record wrote it back to the repo.** The save that applies a
+  record fired `updated`, so a model using `AutoSyncsWithAtp` or
+  `AutoSyncsWithReference` resynced inside the signal handler, before the mapper's
+  `afterUpsert()` had landed the rest of the content. An echo of our own write became a
+  second write, and a genuine remote edit was overwritten with stale content, then
+  written again by anything `afterUpsert()` saved. Every inbound path now runs inside
+  `AutoSync::without()`, `afterUpsert()` included.
+
+- **A returned CID could fail to reach the row.** The metadata writers set attributes
+  and saved, and a save writes only what differs from the instance's original. A stale
+  instance receiving the CID it started with wrote nothing, leaving the row on a CID
+  the repo no longer held. `SyncService` and `ReferenceSyncService` now write these
+  columns with a direct update keyed on the model. Timestamps and event behavior are
+  unchanged.
+
+- **A failed reference deleted a live main record.** With `rollback_on_failure`,
+  `syncWithReference()` unsynced the main record whenever the reference failed, including
+  when the main record already existed and had only been updated or left unchanged. Only
+  a main record the same call created is rolled back now.
+
+- **The echo guard missed reference records.** `ParitySignal` looked a model up by the
+  main URI column and compared the main CID column, where a reference record's own URI
+  and CID never are. For a reference mapper it now uses the reference columns, so an
+  echo with an unchanged CID is skipped, and a backfilled reference we already hold is
+  no longer re-applied.
+
+- **A skipped resync still uploaded its overflow blob.** Overflow ran while the record
+  was built, before the unchanged-write guard. The guard now decides on a draft whose
+  blob is addressed locally, and only a real write uploads.
+
+### Added
+- **`AutoSync::without(callable)`** runs a callback with every auto-sync trait
+  suppressed, for app code that mirrors the repo rather than changing it. Nests safely
+  and ends on return or exception. `AutoSync::isSuppressed()` reports the state.
+- **`RecordMapper::withoutOverflowUploads(callable)`** builds records whose overflow
+  blobs are addressed locally instead of uploaded.
+- **`BlobCid`**, the CID a PDS assigns a blob's bytes.
+
+### Tests
+- An update or create event with no record body, the shape of a superseded event, is
+  pinned as skipped without an upsert or an exception.
+
 ## v1.1.0
 
 ### Added
