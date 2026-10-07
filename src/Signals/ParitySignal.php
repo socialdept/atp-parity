@@ -5,6 +5,7 @@ namespace SocialDept\AtpParity\Signals;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
+use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Contracts\ResolvesConflictStrategy;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\ConflictResolved;
@@ -287,12 +288,11 @@ class ParitySignal extends Signal
         ];
 
         // Check for existing model and potential conflict
-        $existing = $mapper->findByUri($uri);
+        $existing = $this->findExisting($mapper, $uri);
 
         // Skip if CID is unchanged - record is already synced
         if ($existing) {
-            $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
-            $existingCid = $existing->getAttribute($cidColumn);
+            $existingCid = $existing->getAttribute($this->cidColumnFor($mapper));
 
             if ($existingCid !== null && $existingCid === $commit->cid) {
                 $this->debug('Skipping upsert: CID unchanged (already synced)', $event, [
@@ -326,7 +326,12 @@ class ParitySignal extends Signal
         // Capture existing blob CIDs before any changes
         $existingBlobs = $existing?->getAttribute('atp_blobs');
 
-        if ($existing && $this->conflictDetector->hasConflict($existing, $record, $commit->cid)) {
+        // INFO: a reference record carries no content to conflict over, and the
+        // resolver applies records through the main columns, which would write the
+        // reference's URI over the main record's.
+        if ($existing
+            && ! $mapper instanceof ReferenceMapper
+            && $this->conflictDetector->hasConflict($existing, $record, $commit->cid)) {
             // A mapper may decide per record — authority often belongs to the
             // record's provenance rather than to a global setting.
             $strategy = ($mapper instanceof ResolvesConflictStrategy
@@ -373,6 +378,33 @@ class ParitySignal extends Signal
             // Sync blobs to MediaLibrary if changed
             $this->syncBlobsIfChanged($result, $mapper, $existingBlobs, $event->did);
         }
+    }
+
+    /**
+     * The model this event's record is already applied to, if any.
+     *
+     * A reference record's own URI lives in the reference column. The main URI
+     * column holds what it points at, so a lookup there never finds it.
+     */
+    protected function findExisting(RecordMapper $mapper, string $uri): ?Model
+    {
+        if (! $mapper instanceof ReferenceMapper) {
+            return $mapper->findByUri($uri);
+        }
+
+        $modelClass = $mapper->modelClass();
+
+        return $modelClass::where($mapper->referenceUriColumn(), $uri)->first();
+    }
+
+    /**
+     * The column holding the CID of the record this mapper handles.
+     */
+    protected function cidColumnFor(RecordMapper $mapper): string
+    {
+        return $mapper instanceof ReferenceMapper
+            ? $mapper->referenceCidColumn()
+            : config('atp-parity.columns.cid', 'atp_cid');
     }
 
     /**
