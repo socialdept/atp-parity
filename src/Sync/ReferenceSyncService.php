@@ -11,6 +11,7 @@ use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Support\MetaColumns;
 use SocialDept\AtpParity\Support\RecordCid;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 use Throwable;
@@ -359,11 +360,9 @@ class ReferenceSyncService
         $uriColumn = config('atp-parity.columns.uri', 'atp_uri');
         $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
 
-        $model->{$uriColumn} = $ref->uri;
-        if ($ref->cid) {
-            $model->{$cidColumn} = $ref->cid;
-        }
-        $model->saveQuietly();
+        MetaColumns::write($model, $ref->cid
+            ? [$uriColumn => $ref->uri, $cidColumn => $ref->cid]
+            : [$uriColumn => $ref->uri]);
     }
 
     /**
@@ -402,9 +401,10 @@ class ReferenceSyncService
         string $uri,
         string $cid
     ): void {
-        $model->{$mapper->referenceUriColumn()} = $uri;
-        $model->{$mapper->referenceCidColumn()} = $cid;
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $mapper->referenceUriColumn() => $uri,
+            $mapper->referenceCidColumn() => $cid,
+        ]);
     }
 
     /**
@@ -412,9 +412,10 @@ class ReferenceSyncService
      */
     protected function clearReferenceModelMeta(Model $model, ReferenceMapper $mapper): void
     {
-        $model->{$mapper->referenceUriColumn()} = null;
-        $model->{$mapper->referenceCidColumn()} = null;
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $mapper->referenceUriColumn() => null,
+            $mapper->referenceCidColumn() => null,
+        ]);
     }
 
     /**

@@ -9,6 +9,7 @@ use SocialDept\AtpClient\Facades\Atp;
 use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\RecordUnsynced;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Support\MetaColumns;
 use SocialDept\AtpParity\Support\RecordCid;
 use Throwable;
 
@@ -283,10 +284,11 @@ class SyncService
         $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
         $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
-        $model->{$uriColumn} = $uri;
-        $model->{$cidColumn} = $cid;
-        $model->{$syncedAtColumn} = now();
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $uriColumn => $uri,
+            $cidColumn => $cid,
+            $syncedAtColumn => now(),
+        ]);
     }
 
     /**
@@ -298,10 +300,11 @@ class SyncService
         $cidColumn = config('atp-parity.columns.cid', 'atp_cid');
         $syncedAtColumn = config('atp-parity.columns.synced_at', 'atp_synced_at');
 
-        $model->{$uriColumn} = null;
-        $model->{$cidColumn} = null;
-        $model->{$syncedAtColumn} = null;
-        $model->saveQuietly();
+        MetaColumns::write($model, [
+            $uriColumn => null,
+            $cidColumn => null,
+            $syncedAtColumn => null,
+        ]);
     }
 
     /**
