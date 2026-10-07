@@ -8,6 +8,7 @@ use SocialDept\AtpClient\Exceptions\OAuthSessionInvalidException;
 use SocialDept\AtpParity\Enums\PendingSyncOperation;
 use SocialDept\AtpParity\MapperRegistry;
 use SocialDept\AtpParity\PendingSync\PendingSyncManager;
+use SocialDept\AtpParity\Support\AutoSync;
 use SocialDept\AtpParity\Sync\SyncService;
 
 /**
@@ -18,6 +19,9 @@ use SocialDept\AtpParity\Sync\SyncService;
  *
  * Override shouldAutoSync() and shouldAutoUnsync() to customize
  * the conditions under which auto-syncing occurs.
+ *
+ * Nothing syncs inside {@see AutoSync::without()}, which is where every inbound
+ * record is applied.
  *
  * @mixin \Illuminate\Database\Eloquent\Model
  */
@@ -31,6 +35,10 @@ trait AutoSyncsWithAtp
     public static function bootAutoSyncsWithAtp(): void
     {
         static::created(function ($model) {
+            if (AutoSync::isSuppressed()) {
+                return;
+            }
+
             if ($model->shouldAutoSync()) {
                 $did = $model->syncAsDid();
 
@@ -47,6 +55,10 @@ trait AutoSyncsWithAtp
         });
 
         static::updated(function ($model) {
+            if (AutoSync::isSuppressed()) {
+                return;
+            }
+
             if ($model->isSynced() && $model->shouldAutoSync() && static::recordCouldHaveChanged($model)) {
                 try {
                     app(SyncService::class)->resync($model);
@@ -63,6 +75,10 @@ trait AutoSyncsWithAtp
         });
 
         static::deleted(function ($model) {
+            if (AutoSync::isSuppressed()) {
+                return;
+            }
+
             if ($model->isSynced() && $model->shouldAutoUnsync()) {
                 try {
                     app(SyncService::class)->unsync($model);

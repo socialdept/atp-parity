@@ -13,6 +13,7 @@ use SocialDept\AtpParity\Contracts\RecordMapper as RecordMapperContract;
 use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
 use SocialDept\AtpParity\Fields\FieldMap;
+use SocialDept\AtpParity\Support\AutoSync;
 use SocialDept\AtpParity\Support\BlobReferences;
 use SocialDept\AtpParity\Support\ModelDid;
 use SocialDept\AtpParity\Support\RecordSize;
@@ -446,41 +447,46 @@ abstract class RecordMapper implements RecordMapperContract
 
     public function upsert(Data $record, array $meta = []): ?Model
     {
-        $record = $this->resolveOverflow($record, $meta);
+        // INFO: applying the record, afterUpsert() included, is one inbound write. A
+        // save in here that auto-synced would write the record back to the repo it
+        // came from, and before afterUpsert() runs it would write stale content.
+        return AutoSync::without(function () use ($record, $meta): ?Model {
+            $record = $this->resolveOverflow($record, $meta);
 
-        $uri = $meta['uri'] ?? null;
-        $existing = $uri ? $this->findByUri($uri) : null;
+            $uri = $meta['uri'] ?? null;
+            $existing = $uri ? $this->findByUri($uri) : null;
 
-        // Resolved before the gate and handed over in `$meta['existing']`, so a
-        // mapper can tell a create from an update without querying again — the
-        // same row was otherwise fetched three times per event. Passed through
-        // meta rather than a fourth parameter: changing the signature would
-        // break every mapper that overrides this, in every consuming app.
-        if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
-            return null;
-        }
-
-        if ($uri) {
-            if ($existing) {
-                $this->updateModel($existing, $record, $meta);
-                $existing->save();
-                $this->afterUpsert($existing, $record, $meta, created: false);
-
-                return $existing;
+            // Resolved before the gate and handed over in `$meta['existing']`, so a
+            // mapper can tell a create from an update without querying again — the
+            // same row was otherwise fetched three times per event. Passed through
+            // meta rather than a fourth parameter: changing the signature would
+            // break every mapper that overrides this, in every consuming app.
+            if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
+                return null;
             }
-        }
 
-        $model = $this->toModel($record, $meta);
-        $model->save();
+            if ($uri) {
+                if ($existing) {
+                    $this->updateModel($existing, $record, $meta);
+                    $existing->save();
+                    $this->afterUpsert($existing, $record, $meta, created: false);
 
-        // A create is the only moment a parked reference becomes actionable: if
-        // the target had existed, the reference would have applied directly.
-        // Updates skip this entirely.
-        $this->replayDeferredReferences($model, $meta);
+                    return $existing;
+                }
+            }
 
-        $this->afterUpsert($model, $record, $meta, created: true);
+            $model = $this->toModel($record, $meta);
+            $model->save();
 
-        return $model;
+            // A create is the only moment a parked reference becomes actionable: if
+            // the target had existed, the reference would have applied directly.
+            // Updates skip this entirely.
+            $this->replayDeferredReferences($model, $meta);
+
+            $this->afterUpsert($model, $record, $meta, created: true);
+
+            return $model;
+        });
     }
 
     /**
@@ -493,6 +499,9 @@ abstract class RecordMapper implements RecordMapperContract
      *
      * `$created` distinguishes the two cases that usually need different
      * handling: seeding initial state versus recording a subsequent change.
+     *
+     * Runs inside {@see AutoSync::without()}: whatever it saves mirrors the repo, so
+     * nothing it does is written back out.
      *
      * @param  array<string, mixed>  $meta
      */

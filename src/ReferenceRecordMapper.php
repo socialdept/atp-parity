@@ -11,6 +11,7 @@ use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Data\DeferredReference;
 use SocialDept\AtpParity\Enums\ReferenceFormat;
 use SocialDept\AtpParity\Events\DeferredReferenceParked;
+use SocialDept\AtpParity\Support\AutoSync;
 use SocialDept\AtpSchema\Data\Data;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 
@@ -204,38 +205,40 @@ abstract class ReferenceRecordMapper extends RecordMapper implements ReferenceMa
      */
     public function upsert(Data $record, array $meta = []): ?Model
     {
-        $ref = $this->extractReference($record);
+        return AutoSync::without(function () use ($record, $meta): ?Model {
+            $ref = $this->extractReference($record);
 
-        if (! $ref) {
-            return null;
-        }
+            if (! $ref) {
+                return null;
+            }
 
-        // By the main URI first; fall back to the reference column for a model
-        // we have already linked, so re-delivery is idempotent.
-        $existing = $this->findByUri($ref->uri)
-            ?? (isset($meta['uri']) ? $this->findByReferenceUri($meta['uri']) : null);
+            // By the main URI first; fall back to the reference column for a model
+            // we have already linked, so re-delivery is idempotent.
+            $existing = $this->findByUri($ref->uri)
+                ?? (isset($meta['uri']) ? $this->findByReferenceUri($meta['uri']) : null);
 
-        if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
-            return null;
-        }
+            if (! $this->shouldImport($record, $meta + ['existing' => $existing])) {
+                return null;
+            }
 
-        if (! $existing) {
-            $this->referenceTargetMissing($record, $meta, $ref->uri);
+            if (! $existing) {
+                $this->referenceTargetMissing($record, $meta, $ref->uri);
 
-            return null;
-        }
+                return null;
+            }
 
-        if (isset($meta['uri'])) {
-            $existing->setAttribute($this->referenceUriColumn(), $meta['uri']);
-        }
+            if (isset($meta['uri'])) {
+                $existing->setAttribute($this->referenceUriColumn(), $meta['uri']);
+            }
 
-        if (isset($meta['cid'])) {
-            $existing->setAttribute($this->referenceCidColumn(), $meta['cid']);
-        }
+            if (isset($meta['cid'])) {
+                $existing->setAttribute($this->referenceCidColumn(), $meta['cid']);
+            }
 
-        $existing->save();
+            $existing->save();
 
-        return $existing;
+            return $existing;
+        });
     }
 
     /**

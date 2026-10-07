@@ -10,6 +10,7 @@ use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\ConflictResolved;
 use SocialDept\AtpParity\Events\RecordConstructionFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\Support\AutoSync;
 use SocialDept\AtpParity\Sync\ConflictDetector;
 use SocialDept\AtpParity\Sync\ConflictResolver;
 use SocialDept\AtpParity\Sync\ConflictStrategy;
@@ -164,7 +165,7 @@ class ParitySignal extends Signal
 
         try {
             if ($commit->isCreate() || $commit->isUpdate()) {
-                $this->handleUpsert($event, $mapper);
+                AutoSync::without(fn () => $this->handleUpsert($event, $mapper));
             } elseif ($commit->isDelete()) {
                 $this->handleDelete($event, $mapper);
             }
