@@ -14,6 +14,7 @@ use SocialDept\AtpParity\Enums\ValidationMode;
 use SocialDept\AtpParity\Events\DeferredReferenceResolved;
 use SocialDept\AtpParity\Fields\FieldMap;
 use SocialDept\AtpParity\Support\AutoSync;
+use SocialDept\AtpParity\Support\BlobCid;
 use SocialDept\AtpParity\Support\BlobReferences;
 use SocialDept\AtpParity\Support\ModelDid;
 use SocialDept\AtpParity\Support\RecordSize;
@@ -40,6 +41,8 @@ abstract class RecordMapper implements RecordMapperContract
     private ?FieldMap $fieldMap = null;
 
     protected static bool $overflowEnabled = true;
+
+    protected static bool $overflowUploads = true;
 
     /**
      * Get the Record class this mapper handles.
@@ -274,6 +277,30 @@ abstract class RecordMapper implements RecordMapperContract
     }
 
     /**
+     * Build records whose overflow blobs are addressed locally instead of uploaded.
+     *
+     * A blob's CID is the hash of its bytes, so the record a write would produce
+     * can be built and hashed without a PDS. The sync services use this to decide
+     * whether a write is needed before uploading anything for it.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    public static function withoutOverflowUploads(callable $callback): mixed
+    {
+        $previous = static::$overflowUploads;
+        static::$overflowUploads = false;
+
+        try {
+            return $callback();
+        } finally {
+            static::$overflowUploads = $previous;
+        }
+    }
+
+    /**
      * Move declared fields into a blob once the record exceeds their threshold.
      *
      * Measured with the `$type` a PDS adds before it hashes, so the number is
@@ -312,11 +339,11 @@ abstract class RecordMapper implements RecordMapperContract
                 continue;
             }
 
-            $blob = app(BlobManager::class)->uploadFromContent(
-                $did,
-                (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-                $field->overflowMimeType,
-            );
+            $content = (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+            $blob = static::$overflowUploads
+                ? app(BlobManager::class)->uploadFromContent($did, $content, $field->overflowMimeType)
+                : new BlobReference(ref: BlobCid::for($content), mimeType: $field->overflowMimeType, size: strlen($content));
 
             Arr::forget($data, $path);
             Arr::set($data, $field->overflowBlobPath, $blob->toArray());

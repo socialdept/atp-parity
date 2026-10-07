@@ -11,6 +11,7 @@ use SocialDept\AtpParity\Contracts\ReferenceMapper;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\Events\ReferenceSyncFailed;
 use SocialDept\AtpParity\MapperRegistry;
+use SocialDept\AtpParity\RecordMapper as AbstractRecordMapper;
 use SocialDept\AtpParity\Support\MetaColumns;
 use SocialDept\AtpParity\Support\RecordCid;
 use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
@@ -240,6 +241,14 @@ class ReferenceSyncService
         }
 
         try {
+            if (! $force && $mapper instanceof AbstractRecordMapper && $mapper->fieldMap()->overflowFields() !== []) {
+                $draft = AbstractRecordMapper::withoutOverflowUploads(fn () => $mapper->toRecord($model));
+
+                if ($unchanged = $this->referenceAlreadyInRepo($model, $mapper, $draft->toRecord())) {
+                    return SyncResult::unchanged($uri, $unchanged);
+                }
+            }
+
             $record = $mapper->toRecord($model);
 
             // INFO: hash `toRecord()`, not `toArray()`. A PDS adds the top-level
