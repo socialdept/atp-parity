@@ -63,12 +63,48 @@ Check: Is collection registered?
       ↓
    Yes → Get mapper for collection
       ↓
-Create DTO from event record
+Convert to IncomingRecord
+      ↓
+RecordApplier.apply(): upcast, build the DTO, validate,
+skip echoes and backfill replays, resolve conflicts
       ↓
 Call mapper.upsert() or mapper.deleteByUri()
       ↓
 Model saved to database
 ```
+
+## Other Transports
+
+`ParitySignal` only adapts commit events. Everything after that lives in
+`SocialDept\AtpParity\Sync\RecordApplier`, so any other ingest pipeline gets the
+same echo, backfill and conflict rules by building an `IncomingRecord`:
+
+```php
+use SocialDept\AtpParity\Data\IncomingRecord;
+use SocialDept\AtpParity\Sync\RecordApplier;
+
+$outcome = app(RecordApplier::class)->apply(new IncomingRecord(
+    did: $did,
+    collection: $collection,
+    rkey: $rkey,
+    cid: $cid,
+    record: $record,
+    backfill: $isHistoricalReplay,
+));
+
+// A delete
+app(RecordApplier::class)->apply(IncomingRecord::deletion($did, $collection, $rkey));
+```
+
+`apply()` returns an `ApplyOutcome` (`Created`, `Updated`, `Unchanged`,
+`BackfillHeld`, `Refused` and so on) and rethrows a mapper exception for the
+transport to handle.
+
+`preview()` takes the same input, walks the same path and writes nothing: no model,
+no blob sync, no events. Run it beside an existing transport to compare decisions
+before switching. Two differences from `apply()`: a conflict reports `Conflict`
+without running the strategy, and a record that cannot be built reports
+`Unconstructable` even where `apply()` would throw.
 
 ## Example: Syncing Posts
 
