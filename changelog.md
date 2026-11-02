@@ -2,6 +2,24 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.2.0
+
+### Added
+- **`RecordApplier` applies an inbound record from any transport.** Everything
+  `ParitySignal` did after receiving a commit (upcasting, validation, the echo and
+  backfill guards, conflict resolution, blob sync) now lives in
+  `Sync\RecordApplier`, fed an `IncomingRecord`. Another ingest pipeline gets the
+  same rules without depending on atp-signals. `apply()` returns an `ApplyOutcome`.
+- **`RecordApplier::preview()`** reports what `apply()` would do and writes nothing,
+  so a new transport can be compared against the old one before it is allowed to
+  write.
+
+### Changed
+- `ParitySignal` delegates to `RecordApplier`. Its filters and the `handleUpsert()`
+  and `handleDelete()` hooks are unchanged. The protected helpers that moved
+  (`findExisting()`, `validateRecord()`, `syncBlobsIfChanged()` and the blob CID
+  comparison) are now on `RecordApplier`, and its warnings log as `[Parity]`.
+
 ## v1.1.1
 
 ### Fixed
