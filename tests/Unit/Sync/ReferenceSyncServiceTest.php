@@ -4,6 +4,7 @@ namespace SocialDept\AtpParity\Tests\Unit\Sync;
 
 use Illuminate\Support\Facades\Event;
 use Mockery;
+use SocialDept\AtpClient\Data\Responses\Atproto\Repo\CreateRecordResponse;
 use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\ReferenceSynced;
 use SocialDept\AtpParity\Events\ReferenceSyncFailed;
@@ -757,6 +758,34 @@ class ReferenceSyncServiceTest extends TestCase
     // ==========================================
     // Helper methods
     // ==========================================
+
+    public function test_reference_synced_carries_the_commit_revision_and_the_record(): void
+    {
+        $model = ReferenceModel::create([
+            'title' => 'Test',
+            'atp_uri' => 'at://did:plc:test/app.test.main/abc',
+            'atp_cid' => 'bafyreiMain',
+        ]);
+
+        $repoClient = Mockery::mock();
+        $repoClient->shouldReceive('createRecord')->andReturn(CreateRecordResponse::fromArray([
+            'uri' => 'at://did:plc:test/app.test.ref/xyz',
+            'cid' => 'bafyreiRef',
+            'commit' => ['cid' => 'bafycommit', 'rev' => '3lref'],
+        ]));
+        $atprotoClient = Mockery::mock();
+        $atprotoClient->repo = $repoClient;
+        $atpClient = Mockery::mock();
+        $atpClient->atproto = $atprotoClient;
+        $manager = Mockery::mock();
+        $manager->shouldReceive('as')->with('did:plc:test')->andReturn($atpClient);
+        $this->app->instance('atp-client', $manager);
+
+        $this->service->syncReferenceOnly('did:plc:test', $model, $this->referenceMapper);
+
+        Event::assertDispatched(ReferenceSynced::class, fn (ReferenceSynced $event) => $event->rev === '3lref'
+            && $event->record['$type'] === 'app.test.reference');
+    }
 
     protected function mockAtpClient(string $did, string $returnUri, string $returnCid): void
     {

@@ -4,6 +4,9 @@ namespace SocialDept\AtpParity\Tests\Unit\Sync;
 
 use Illuminate\Support\Facades\Event;
 use Mockery;
+use SocialDept\AtpClient\Data\Responses\Atproto\Repo\CreateRecordResponse;
+use SocialDept\AtpClient\Data\Responses\Atproto\Repo\DeleteRecordResponse;
+use SocialDept\AtpClient\Data\Responses\Atproto\Repo\PutRecordResponse;
 use SocialDept\AtpParity\Events\RecordSynced;
 use SocialDept\AtpParity\Events\RecordUnsynced;
 use SocialDept\AtpParity\MapperRegistry;
@@ -90,6 +93,57 @@ class SyncServiceTest extends TestCase
         $this->service->sync($model);
 
         Event::assertDispatched(RecordSynced::class);
+    }
+
+    /**
+     * A listener indexing our own write needs the commit's revision and the
+     * record as the PDS stored it, so the firehose echo arrives already known.
+     */
+    public function test_record_synced_carries_the_commit_revision_and_the_record(): void
+    {
+        $model = new TestModel(['content' => 'Test', 'did' => 'did:plc:test']);
+
+        $this->bindRepo('did:plc:test', 'createRecord', CreateRecordResponse::fromArray([
+            'uri' => 'at://did:plc:test/app.test.record/rkey',
+            'cid' => 'bafycreated',
+            'commit' => ['cid' => 'bafycommit', 'rev' => '3lcreated'],
+        ]));
+
+        $this->service->sync($model);
+
+        Event::assertDispatched(RecordSynced::class, fn (RecordSynced $event) => $event->rev === '3lcreated'
+            && $event->record['$type'] === 'app.test.record'
+            && $event->record['text'] === 'Test');
+    }
+
+    public function test_record_synced_carries_the_revision_of_an_update(): void
+    {
+        $model = TestModel::create([
+            'content' => 'Changed',
+            'atp_uri' => 'at://did:plc:test/app.test.record/rkey',
+            'atp_cid' => 'bafyold',
+        ]);
+
+        $this->bindRepo('did:plc:test', 'putRecord', PutRecordResponse::fromArray([
+            'uri' => 'at://did:plc:test/app.test.record/rkey',
+            'cid' => 'bafyput',
+            'commit' => ['cid' => 'bafycommit', 'rev' => '3lput'],
+        ]));
+
+        $this->service->resync($model);
+
+        Event::assertDispatched(RecordSynced::class, fn (RecordSynced $event) => $event->rev === '3lput' && $event->record['text'] === 'Changed');
+    }
+
+    public function test_record_synced_has_no_revision_when_the_pds_reports_no_commit(): void
+    {
+        $model = new TestModel(['content' => 'Test', 'did' => 'did:plc:test']);
+
+        $this->mockAtpClient('did:plc:test', 'at://did/col/rkey', 'cid');
+
+        $this->service->sync($model);
+
+        Event::assertDispatched(RecordSynced::class, fn (RecordSynced $event) => $event->rev === null);
     }
 
     public function test_sync_redirects_to_resync_when_already_synced(): void
@@ -194,6 +248,23 @@ class SyncServiceTest extends TestCase
         Event::assertDispatched(RecordUnsynced::class);
     }
 
+    public function test_record_unsynced_carries_the_delete_revision(): void
+    {
+        $model = TestModel::create([
+            'content' => 'To delete',
+            'atp_uri' => 'at://did:plc:test/app.test.record/xyz',
+            'atp_cid' => 'cid',
+        ]);
+
+        $this->bindRepo('did:plc:test', 'deleteRecord', DeleteRecordResponse::fromArray([
+            'commit' => ['cid' => 'bafycommit', 'rev' => '3ldeleted'],
+        ]));
+
+        $this->service->unsync($model);
+
+        Event::assertDispatched(RecordUnsynced::class, fn (RecordUnsynced $event) => $event->rev === '3ldeleted');
+    }
+
     public function test_unsync_returns_false_when_not_synced(): void
     {
         $model = new TestModel(['content' => 'Not synced']);
@@ -253,6 +324,23 @@ class SyncServiceTest extends TestCase
     /**
      * Mock AtpClient for create operations.
      */
+    protected function bindRepo(string $did, string $method, object $response): void
+    {
+        $repoClient = Mockery::mock();
+        $repoClient->shouldReceive($method)->andReturn($response);
+
+        $atprotoClient = Mockery::mock();
+        $atprotoClient->repo = $repoClient;
+
+        $atpClient = Mockery::mock();
+        $atpClient->atproto = $atprotoClient;
+
+        $manager = Mockery::mock();
+        $manager->shouldReceive('as')->with($did)->andReturn($atpClient);
+
+        $this->app->instance('atp-client', $manager);
+    }
+
     protected function mockAtpClient(string $did, string $returnUri, string $returnCid): void
     {
         $response = new \stdClass();

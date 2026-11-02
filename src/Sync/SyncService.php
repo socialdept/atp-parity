@@ -82,7 +82,7 @@ class SyncService
             // Update model with ATP metadata
             $this->updateModelMeta($model, $response->uri, $response->cid);
 
-            event(new RecordSynced($model, $response->uri, $response->cid));
+            event(new RecordSynced($model, $response->uri, $response->cid, $response->commit->rev ?? null, $record->toRecord()));
 
             return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
@@ -163,7 +163,7 @@ class SyncService
             // Update model with new CID
             $this->updateModelMeta($model, $response->uri, $response->cid);
 
-            event(new RecordSynced($model, $response->uri, $response->cid));
+            event(new RecordSynced($model, $response->uri, $response->cid, $response->commit->rev ?? null, $record->toRecord()));
 
             return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
@@ -194,7 +194,7 @@ class SyncService
 
         try {
             $client = Atp::as($parts['did']);
-            $client->atproto->repo->deleteRecord(
+            $response = $client->atproto->repo->deleteRecord(
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
             );
@@ -202,7 +202,7 @@ class SyncService
             // Clear ATP metadata from model
             $this->clearModelMeta($model);
 
-            event(new RecordUnsynced($model, $uri));
+            event(new RecordUnsynced($model, $uri, $response->commit->rev ?? null));
 
             return true;
         } catch (Throwable $e) {
