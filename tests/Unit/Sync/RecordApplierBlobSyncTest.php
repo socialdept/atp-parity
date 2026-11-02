@@ -1,18 +1,18 @@
 <?php
 
-namespace SocialDept\AtpParity\Tests\Unit\Signals;
+namespace SocialDept\AtpParity\Tests\Unit\Sync;
 
 use Illuminate\Database\Eloquent\Model;
 use SocialDept\AtpParity\Contracts\RecordMapper;
 use SocialDept\AtpParity\MapperRegistry;
-use SocialDept\AtpParity\Signals\ParitySignal;
+use SocialDept\AtpParity\Sync\RecordApplier;
 use SocialDept\AtpParity\Tests\Fixtures\MediaMapper;
 use SocialDept\AtpParity\Tests\Fixtures\MediaModel;
 use SocialDept\AtpParity\Tests\TestCase;
 
-class ParitySignalBlobSyncTest extends TestCase
+class RecordApplierBlobSyncTest extends TestCase
 {
-    protected ParitySignal $signal;
+    protected RecordApplier $applier;
 
     protected MapperRegistry $registry;
 
@@ -25,7 +25,7 @@ class ParitySignalBlobSyncTest extends TestCase
         $this->registry = app(MapperRegistry::class);
         $this->registry->register(new MediaMapper());
 
-        $this->signal = app(ParitySignal::class);
+        $this->applier = app(RecordApplier::class);
     }
 
     protected function createMediaModelsTable(): void
@@ -55,11 +55,11 @@ class ParitySignalBlobSyncTest extends TestCase
         $did = 'did:plc:eventdid';
 
         // Use reflection to call protected method
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('syncBlobsIfChanged');
         $method->setAccessible(true);
 
-        $method->invoke($this->signal, $model, $mapper, $oldBlobs, $did);
+        $method->invoke($this->applier, $model, $mapper, $oldBlobs, $did);
 
         $this->assertCount(1, $model->syncCalls);
         $this->assertSame('did:plc:eventdid', $model->syncCalls[0]['did']);
@@ -80,11 +80,11 @@ class ParitySignalBlobSyncTest extends TestCase
         $oldBlobs = $blobs; // Same as current, no change
         $did = 'did:plc:eventdid';
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('syncBlobsIfChanged');
         $method->setAccessible(true);
 
-        $method->invoke($this->signal, $model, $mapper, $oldBlobs, $did);
+        $method->invoke($this->applier, $model, $mapper, $oldBlobs, $did);
 
         // Should not have called sync since blobs are unchanged
         $this->assertCount(0, $model->syncCalls);
@@ -105,11 +105,11 @@ class ParitySignalBlobSyncTest extends TestCase
         ];
         $did = 'did:plc:eventdid';
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('syncBlobsIfChanged');
         $method->setAccessible(true);
 
-        $method->invoke($this->signal, $model, $mapper, $oldBlobs, $did);
+        $method->invoke($this->applier, $model, $mapper, $oldBlobs, $did);
 
         // Should have called sync since CID changed
         $this->assertCount(1, $model->syncCalls);
@@ -129,11 +129,11 @@ class ParitySignalBlobSyncTest extends TestCase
         $mapper = $this->createMock(RecordMapper::class);
         $mapper->method('hasBlobFields')->willReturn(false);
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('syncBlobsIfChanged');
         $method->setAccessible(true);
 
-        $method->invoke($this->signal, $model, $mapper, null, 'did:plc:test');
+        $method->invoke($this->applier, $model, $mapper, null, 'did:plc:test');
 
         // Should not have called sync since mapper has no blob fields
         $this->assertCount(0, $model->syncCalls);
@@ -153,12 +153,12 @@ class ParitySignalBlobSyncTest extends TestCase
 
         $mapper = new MediaMapper();
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('syncBlobsIfChanged');
         $method->setAccessible(true);
 
         // Should not throw, just skip
-        $method->invoke($this->signal, $model, $mapper, null, 'did:plc:test');
+        $method->invoke($this->applier, $model, $mapper, null, 'did:plc:test');
 
         // No exception means it handled the missing method gracefully
         $this->assertTrue(true);
@@ -174,11 +174,11 @@ class ParitySignalBlobSyncTest extends TestCase
             ],
         ];
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('blobsUnchanged');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->signal, $blobs, $blobs);
+        $result = $method->invoke($this->applier, $blobs, $blobs);
 
         $this->assertTrue($result);
     }
@@ -192,29 +192,29 @@ class ParitySignalBlobSyncTest extends TestCase
             'icon' => ['cid' => 'bafynew', 'mimeType' => 'image/png', 'size' => 1024],
         ];
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('blobsUnchanged');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->signal, $oldBlobs, $newBlobs);
+        $result = $method->invoke($this->applier, $oldBlobs, $newBlobs);
 
         $this->assertFalse($result);
     }
 
     public function test_blobs_unchanged_handles_null_values(): void
     {
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('blobsUnchanged');
         $method->setAccessible(true);
 
         // Both null = unchanged
-        $this->assertTrue($method->invoke($this->signal, null, null));
+        $this->assertTrue($method->invoke($this->applier, null, null));
 
         // Null to something = changed
-        $this->assertFalse($method->invoke($this->signal, null, ['icon' => ['cid' => 'bafy']]));
+        $this->assertFalse($method->invoke($this->applier, null, ['icon' => ['cid' => 'bafy']]));
 
         // Something to null = changed
-        $this->assertFalse($method->invoke($this->signal, ['icon' => ['cid' => 'bafy']], null));
+        $this->assertFalse($method->invoke($this->applier, ['icon' => ['cid' => 'bafy']], null));
     }
 
     public function test_extract_blob_cids_extracts_single_blobs(): void
@@ -223,11 +223,11 @@ class ParitySignalBlobSyncTest extends TestCase
             'icon' => ['cid' => 'bafyicon123', 'mimeType' => 'image/png', 'size' => 1024],
         ];
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('extractBlobCids');
         $method->setAccessible(true);
 
-        $cids = $method->invoke($this->signal, $blobs);
+        $cids = $method->invoke($this->applier, $blobs);
 
         $this->assertSame(['icon' => 'bafyicon123'], $cids);
     }
@@ -241,11 +241,11 @@ class ParitySignalBlobSyncTest extends TestCase
             ],
         ];
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('extractBlobCids');
         $method->setAccessible(true);
 
-        $cids = $method->invoke($this->signal, $blobs);
+        $cids = $method->invoke($this->applier, $blobs);
 
         $this->assertSame(['images' => ['bafyimg1', 'bafyimg2']], $cids);
     }
@@ -260,11 +260,11 @@ class ParitySignalBlobSyncTest extends TestCase
             ],
         ];
 
-        $reflection = new \ReflectionClass($this->signal);
+        $reflection = new \ReflectionClass($this->applier);
         $method = $reflection->getMethod('extractBlobCids');
         $method->setAccessible(true);
 
-        $cids = $method->invoke($this->signal, $blobs);
+        $cids = $method->invoke($this->applier, $blobs);
 
         $this->assertSame([
             'avatar' => 'bafyavatar',
