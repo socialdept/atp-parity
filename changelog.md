@@ -2,6 +2,16 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.3.0
+
+### Added
+- **Sync events carry the commit.** `RecordSynced` and `ReferenceSynced` gain `rev`,
+  the commit's revision, and `record`, the value as written with its `$type`.
+  `RecordUnsynced` gains the delete commit's `rev`. A listener can index our own
+  write straight away, so the firehose echo of the same commit arrives already
+  known. Each is null when the PDS reports no commit. The new constructor
+  arguments are optional, so code dispatching these events is unaffected.
+
 ## v1.2.0
 
 ### Added

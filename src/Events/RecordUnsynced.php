@@ -6,7 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * Dispatched when a model is unsynced from AT Protocol.
+ * Dispatched when a model is unsynced from AT Protocol. `rev` is the delete
+ * commit's revision, null when the PDS did not report one.
  */
 class RecordUnsynced
 {
@@ -15,6 +16,7 @@ class RecordUnsynced
     public function __construct(
         public readonly Model $model,
         public readonly string $uri,
+        public readonly ?string $rev = null,
     ) {
     }
 }

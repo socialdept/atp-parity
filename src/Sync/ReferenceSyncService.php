@@ -139,7 +139,7 @@ class ReferenceSyncService
             // Update model with reference record metadata
             $this->updateReferenceModelMeta($model, $mapper, $response->uri, $response->cid);
 
-            event(new ReferenceSynced($model, $response->uri, $response->cid, $mainUri));
+            event(new ReferenceSynced($model, $response->uri, $response->cid, $mainUri, $response->commit->rev ?? null, $record->toRecord()));
 
             return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
@@ -271,7 +271,7 @@ class ReferenceSyncService
             $this->updateReferenceModelMeta($model, $mapper, $response->uri, $response->cid);
 
             $mainUri = $this->getMainUri($model);
-            event(new ReferenceSynced($model, $response->uri, $response->cid, $mainUri));
+            event(new ReferenceSynced($model, $response->uri, $response->cid, $mainUri, $response->commit->rev ?? null, $record->toRecord()));
 
             return SyncResult::success($response->uri, $response->cid);
         } catch (Throwable $e) {
