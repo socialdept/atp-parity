@@ -2,21 +2,11 @@
 
 namespace SocialDept\AtpParity\Signals;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use SocialDept\AtpParity\Contracts\RecordMapper;
-use SocialDept\AtpParity\Contracts\ReferenceMapper;
-use SocialDept\AtpParity\Contracts\ResolvesConflictStrategy;
-use SocialDept\AtpParity\Enums\ValidationMode;
-use SocialDept\AtpParity\Events\ConflictResolved;
-use SocialDept\AtpParity\Events\RecordConstructionFailed;
+use SocialDept\AtpParity\Data\IncomingRecord;
 use SocialDept\AtpParity\MapperRegistry;
-use SocialDept\AtpParity\Support\AutoSync;
-use SocialDept\AtpParity\Sync\ConflictDetector;
-use SocialDept\AtpParity\Sync\ConflictResolver;
-use SocialDept\AtpParity\Sync\ConflictStrategy;
-use SocialDept\AtpParity\Upcasting\UpcasterChain;
-use SocialDept\AtpSchema\Data\Data;
+use SocialDept\AtpParity\Sync\RecordApplier;
 use SocialDept\AtpSignals\Events\SignalEvent;
 use SocialDept\AtpSignals\Signals\Signal;
 
@@ -32,8 +22,8 @@ use SocialDept\AtpSignals\Signals\Signal;
  * - Filter by operation: config('atp-parity.sync.operations') or override operations()
  * - Custom filter: config('atp-parity.sync.filter') or override shouldSync()
  *
- * Supports conflict resolution via configuration:
- * - Strategy: config('atp-parity.conflicts.strategy') - 'remote', 'local', 'newest', 'manual'
+ * Applying the record is {@see RecordApplier}'s job, shared with any other
+ * transport. This class only adapts commit events and filters them.
  *
  * To use this signal, register it in your atp-signals config:
  *
@@ -46,15 +36,10 @@ use SocialDept\AtpSignals\Signals\Signal;
  */
 class ParitySignal extends Signal
 {
-    protected ConflictDetector $conflictDetector;
-
-    protected ConflictResolver $conflictResolver;
-
     public function __construct(
-        protected MapperRegistry $registry
+        protected MapperRegistry $registry,
+        protected RecordApplier $applier,
     ) {
-        $this->conflictDetector = new ConflictDetector();
-        $this->conflictResolver = new ConflictResolver();
     }
 
     /**
@@ -162,11 +147,9 @@ class ParitySignal extends Signal
             return;
         }
 
-        $this->debug('Processing event', $event, ['mapper' => get_class($mapper)]);
-
         try {
             if ($commit->isCreate() || $commit->isUpdate()) {
-                AutoSync::without(fn () => $this->handleUpsert($event, $mapper));
+                $this->handleUpsert($event, $mapper);
             } elseif ($commit->isDelete()) {
                 $this->handleDelete($event, $mapper);
             }
@@ -182,6 +165,58 @@ class ParitySignal extends Signal
 
             throw $e; // Re-throw to let EventDispatcher handle it
         }
+    }
+
+    /**
+     * Handle create or update operations. Override to wrap the apply.
+     */
+    protected function handleUpsert(SignalEvent $event, RecordMapper $mapper): void
+    {
+        $outcome = $this->applier->apply($this->incomingRecord($event));
+
+        $this->debug("Upsert: {$outcome->value}", $event);
+    }
+
+    /**
+     * Handle delete operations. Override to wrap the apply.
+     */
+    protected function handleDelete(SignalEvent $event, RecordMapper $mapper): void
+    {
+        $outcome = $this->applier->apply($this->incomingRecord($event));
+
+        $this->debug("Delete: {$outcome->value}", $event, [
+            'uri' => $this->buildUri($event->did, $event->commit->collection, $event->commit->rkey),
+        ]);
+    }
+
+    /**
+     * The transport-agnostic form of a commit event.
+     */
+    protected function incomingRecord(SignalEvent $event): IncomingRecord
+    {
+        $commit = $event->commit;
+
+        if ($commit->isDelete()) {
+            return IncomingRecord::deletion($event->did, $commit->collection, $commit->rkey, (bool) $event->backfill);
+        }
+
+        return new IncomingRecord(
+            did: $event->did,
+            collection: $commit->collection,
+            rkey: $commit->rkey,
+            cid: $commit->cid,
+            record: $commit->record ? (array) $commit->record : null,
+            // INFO: Jetstream and the firehose leave this null, which must read as live.
+            backfill: (bool) $event->backfill,
+        );
+    }
+
+    /**
+     * Build an AT Protocol URI.
+     */
+    protected function buildUri(string $did, string $collection, string $rkey): string
+    {
+        return "at://{$did}/{$collection}/{$rkey}";
     }
 
     /**
@@ -205,305 +240,6 @@ class ParitySignal extends Signal
     }
 
     /**
-     * Handle create or update operations.
-     */
-    protected function handleUpsert(SignalEvent $event, RecordMapper $mapper): void
-    {
-        $commit = $event->commit;
-
-        if (! $commit->record) {
-            $this->debug('Skipping upsert: record is empty', $event);
-
-            return;
-        }
-
-        $recordClass = $mapper->recordClass();
-
-        // Ensure record class extends Data (required for validation)
-        if (! is_subclass_of($recordClass, Data::class)) {
-            $this->debug('Skipping upsert: record class does not extend Data', $event, [
-                'record_class' => $recordClass,
-            ]);
-
-            return;
-        }
-
-        // Get validation mode early - needed to decide how to handle fromArray() failures
-        $validationMode = $this->getValidationMode($mapper);
-
-        // Try to create the record - may fail if data is malformed
-        try {
-            // INFO: upcast before hydration. The DTO is the current lexicon, so an
-            // older record would fail here or lose fields it does not declare.
-            $record = $recordClass::fromArray(
-                app(UpcasterChain::class)->upcast($commit->collection, (array) $commit->record)
-            );
-        } catch (\Throwable $e) {
-            // Validation disabled - re-throw the exception
-            if (! $validationMode || $validationMode === ValidationMode::Disabled) {
-                throw $e;
-            }
-
-            // Validation enabled - treat construction failures as validation failures
-            if (config('atp-parity.validation.log_failures', true)) {
-                Log::warning('[Parity:Signal] Record failed to construct', [
-                    'did' => $event->did,
-                    'collection' => $commit->collection,
-                    'rkey' => $commit->rkey,
-                    'validation_mode' => $validationMode->value,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            // Observable, not just logged: this path drops the record entirely
-            // while the cursor still advances, so nothing downstream can tell.
-            event(new RecordConstructionFailed(
-                did: $event->did,
-                collection: $commit->collection,
-                rkey: $commit->rkey,
-                error: $e->getMessage(),
-            ));
-
-            $this->debug('Skipping upsert: record failed to construct', $event, [
-                'error' => $e->getMessage(),
-            ]);
-
-            return;
-        }
-
-        // Validate record against lexicon schema if validation is enabled
-        if (! $this->validateRecord($record, $mapper, $event)) {
-            return;
-        }
-
-        $uri = $this->buildUri($event->did, $commit->collection, $commit->rkey);
-        $meta = [
-            'uri' => $uri,
-            'cid' => $commit->cid,
-            'did' => $event->did,
-            'rkey' => $commit->rkey,
-            // Historical replay rather than a live commit. Mappers need this to
-            // tell "we are catching up" from "something just changed".
-            'backfill' => $event->backfill,
-        ];
-
-        // Check for existing model and potential conflict
-        $existing = $this->findExisting($mapper, $uri);
-
-        // Skip if CID is unchanged - record is already synced
-        if ($existing) {
-            $existingCid = $existing->getAttribute($this->cidColumnFor($mapper));
-
-            if ($existingCid !== null && $existingCid === $commit->cid) {
-                $this->debug('Skipping upsert: CID unchanged (already synced)', $event, [
-                    'cid' => $commit->cid,
-                ]);
-
-                return;
-            }
-        }
-
-        // A backfilled event for a record we already hold is us re-reading
-        // history, not news, and it must not be allowed to overwrite local
-        // state. The CID check above cannot catch this: a replay carries the
-        // record's *old* CID, which never matches the latest one we stored, so
-        // every historical version would otherwise be re-applied in turn — and
-        // under the `remote` conflict strategy, applied over newer local edits.
-        //
-        // There is no reliable way to detect staleness after the fact instead.
-        // `rev` is monotonic per repo but an archive stamps a whole backfill
-        // with a single rev, and a record's own `updatedAt` is usually optional
-        // in its lexicon. So the ordering signal has to be the event's, and the
-        // safe reading of "historical" is "do not overwrite".
-        if ($existing && $event->backfill && ! $this->backfillOverwritesExisting()) {
-            $this->debug('Skipping upsert: backfilled event for a record we already hold', $event, [
-                'uri' => $uri,
-            ]);
-
-            return;
-        }
-
-        // Capture existing blob CIDs before any changes
-        $existingBlobs = $existing?->getAttribute('atp_blobs');
-
-        // INFO: a reference record carries no content to conflict over, and the
-        // resolver applies records through the main columns, which would write the
-        // reference's URI over the main record's.
-        if ($existing
-            && ! $mapper instanceof ReferenceMapper
-            && $this->conflictDetector->hasConflict($existing, $record, $commit->cid)) {
-            // A mapper may decide per record — authority often belongs to the
-            // record's provenance rather than to a global setting.
-            $strategy = ($mapper instanceof ResolvesConflictStrategy
-                ? $mapper->conflictStrategy($existing)
-                : null) ?? ConflictStrategy::fromConfig();
-            $resolution = $this->conflictResolver->resolve(
-                $existing,
-                $record,
-                $meta,
-                $mapper,
-                $strategy
-            );
-
-            // If conflict is pending manual resolution, don't apply changes
-            if (! $resolution->isResolved()) {
-                $this->debug('Skipping upsert: conflict pending manual resolution', $event);
-
-                return;
-            }
-
-            event(new ConflictResolved(
-                model: $existing,
-                strategy: $strategy,
-                winner: $resolution->winner,
-                uri: $uri,
-            ));
-
-            $this->debug('Conflict resolved', $event, ['resolution' => $resolution->winner]);
-
-            // Sync blobs if changed during conflict resolution
-            $this->syncBlobsIfChanged($existing, $mapper, $existingBlobs, $event->did);
-
-            return;
-        }
-
-        // No conflict, proceed with normal upsert
-        $result = $mapper->upsert($record, $meta);
-
-        if ($result === null) {
-            $this->debug('Skipping upsert: shouldImport returned false', $event);
-        } else {
-            $this->debug('Upsert successful', $event, ['model_id' => $result->getKey()]);
-
-            // Sync blobs to MediaLibrary if changed
-            $this->syncBlobsIfChanged($result, $mapper, $existingBlobs, $event->did);
-        }
-    }
-
-    /**
-     * The model this event's record is already applied to, if any.
-     *
-     * A reference record's own URI lives in the reference column. The main URI
-     * column holds what it points at, so a lookup there never finds it.
-     */
-    protected function findExisting(RecordMapper $mapper, string $uri): ?Model
-    {
-        if (! $mapper instanceof ReferenceMapper) {
-            return $mapper->findByUri($uri);
-        }
-
-        $modelClass = $mapper->modelClass();
-
-        return $modelClass::where($mapper->referenceUriColumn(), $uri)->first();
-    }
-
-    /**
-     * The column holding the CID of the record this mapper handles.
-     */
-    protected function cidColumnFor(RecordMapper $mapper): string
-    {
-        return $mapper instanceof ReferenceMapper
-            ? $mapper->referenceCidColumn()
-            : config('atp-parity.columns.cid', 'atp_cid');
-    }
-
-    /**
-     * Handle delete operations.
-     */
-    protected function handleDelete(SignalEvent $event, RecordMapper $mapper): void
-    {
-        $commit = $event->commit;
-        $uri = $this->buildUri($event->did, $commit->collection, $commit->rkey);
-
-        $deleted = $mapper->deleteByUri($uri);
-
-        $this->debug($deleted ? 'Delete successful' : 'Delete skipped: model not found', $event, ['uri' => $uri]);
-    }
-
-    /**
-     * Build an AT Protocol URI.
-     */
-    protected function buildUri(string $did, string $collection, string $rkey): string
-    {
-        return "at://{$did}/{$collection}/{$rkey}";
-    }
-
-    /**
-     * Get the effective validation mode for a mapper.
-     *
-     * Checks mapper-specific mode first, then falls back to config.
-     */
-    protected function getValidationMode(RecordMapper $mapper): ?ValidationMode
-    {
-        $configMode = config('atp-parity.validation.mode');
-
-        return $mapper->validationMode() ?? match (true) {
-            $configMode instanceof ValidationMode => $configMode,
-            is_string($configMode) => ValidationMode::tryFrom($configMode),
-            default => null,
-        };
-    }
-
-    /**
-     * Validate record against lexicon schema if validation is enabled.
-     *
-     * Returns true if record is valid or validation is disabled.
-     * Returns false if record fails validation (should be skipped).
-     */
-    protected function validateRecord(Data $record, RecordMapper $mapper, SignalEvent $event): bool
-    {
-        $mode = $this->getValidationMode($mapper);
-
-        // Validation disabled or not configured
-        if (! $mode || $mode === ValidationMode::Disabled) {
-            return true;
-        }
-
-        // Set validation mode on the schema validator
-        if (function_exists('SocialDept\AtpSchema\schema')) {
-            $schema = \SocialDept\AtpSchema\schema();
-            $schema->getValidator()->setMode($mode->value);
-        }
-
-        // Validate the record
-        $errors = $record->validateWithErrors();
-
-        if (empty($errors)) {
-            return true;
-        }
-
-        // Log validation failures if enabled
-        if (config('atp-parity.validation.log_failures', true)) {
-            Log::warning('[Parity:Signal] Record failed validation', [
-                'did' => $event->did,
-                'collection' => $event->commit?->collection,
-                'rkey' => $event->commit?->rkey,
-                'validation_mode' => $mode->value,
-                'errors' => $errors,
-            ]);
-        }
-
-        $this->debug('Skipping upsert: record failed validation', $event, [
-            'validation_mode' => $mode->value,
-            'errors' => $errors,
-        ]);
-
-        return false;
-    }
-
-    /**
-     * Whether a backfilled event may overwrite a record we already hold.
-     *
-     * Off by default. An app that treats the network as the source of truth and
-     * wants a full replay to win can opt in, but for anything that also authors
-     * locally this is how newer local state gets silently reverted.
-     */
-    protected function backfillOverwritesExisting(): bool
-    {
-        return (bool) config('atp-parity.backfill.overwrites_existing', false);
-    }
-
-    /**
      * Log debug message if signal debug is enabled.
      */
     protected function debug(string $message, ?SignalEvent $event, array $extra = []): void
@@ -517,79 +253,5 @@ class ParitySignal extends Signal
             'collection' => $event?->commit?->collection,
             'operation' => $event?->commit?->operation?->value ?? null,
         ], $extra));
-    }
-
-    /**
-     * Sync blobs to MediaLibrary if the blob CIDs have changed.
-     */
-    protected function syncBlobsIfChanged(Model $model, RecordMapper $mapper, ?array $oldBlobs, ?string $did = null): void
-    {
-        // Check if mapper has blob fields
-        if (! $mapper->hasBlobFields()) {
-            return;
-        }
-
-        // Check if model supports MediaLibrary sync
-        if (! method_exists($model, 'syncAtpBlobsToMedia')) {
-            return;
-        }
-
-        // Compare blob CIDs - only sync if different
-        $newBlobs = $model->getAttribute('atp_blobs');
-
-        if ($this->blobsUnchanged($oldBlobs, $newBlobs)) {
-            return;
-        }
-
-        try {
-            $this->debug('Syncing blobs to MediaLibrary', null, [
-                'model' => get_class($model),
-                'model_id' => $model->getKey(),
-                'did' => $did,
-                'old_blobs' => $oldBlobs,
-                'new_blobs' => $newBlobs,
-            ]);
-
-            $model->syncAtpBlobsToMedia($did);
-        } catch (\Throwable $e) {
-            Log::warning('[Parity:Signal] Failed to sync blobs to MediaLibrary', [
-                'model' => get_class($model),
-                'model_id' => $model->getKey(),
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Check if blob CIDs are unchanged between old and new values.
-     */
-    protected function blobsUnchanged(?array $oldBlobs, ?array $newBlobs): bool
-    {
-        $oldCids = $this->extractBlobCids($oldBlobs ?? []);
-        $newCids = $this->extractBlobCids($newBlobs ?? []);
-
-        return $oldCids === $newCids;
-    }
-
-    /**
-     * Extract blob CIDs from an atp_blobs array for comparison.
-     */
-    protected function extractBlobCids(array $blobs): array
-    {
-        $cids = [];
-
-        foreach ($blobs as $field => $data) {
-            if (isset($data['cid'])) {
-                // Single blob
-                $cids[$field] = $data['cid'];
-            } elseif (is_array($data)) {
-                // Array of blobs
-                $cids[$field] = array_map(fn ($b) => $b['cid'] ?? null, $data);
-            }
-        }
-
-        ksort($cids);
-
-        return $cids;
     }
 }
