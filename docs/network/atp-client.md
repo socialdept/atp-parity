@@ -1,6 +1,6 @@
 # atp-client Integration
 
-Parity integrates with atp-client to fetch records from the AT Protocol network and convert them to Eloquent models. The `RecordHelper` class provides a simple interface for these operations.
+Part of the [atp-parity docs](../introduction.md#documentation). Fetching single records by URI with `RecordHelper` and turning them into models.
 
 ## RecordHelper
 
@@ -17,7 +17,7 @@ $helper = app(RecordHelper::class);
 When you provide an AT Protocol URI, RecordHelper:
 
 1. Parses the URI to extract the DID, collection, and rkey
-2. Resolves the DID to find the user's PDS endpoint (via atp-resolver)
+2. Resolves the DID to find the user's PDS endpoint (via the atp-support `Resolver`)
 3. Creates a public client for that PDS
 4. Fetches the record
 5. Converts it using the registered mapper
@@ -28,7 +28,7 @@ This means it works with any AT Protocol server, not just Bluesky.
 
 ### `fetch(string $uri, ?string $recordClass = null): mixed`
 
-Fetches a record and returns it as a typed DTO.
+Fetches a record and returns it as a typed DTO. If no class is given and no mapper is registered for the collection, it returns the raw record array.
 
 ```php
 use SocialDept\AtpParity\Support\RecordHelper;
@@ -67,7 +67,7 @@ if ($post) {
 }
 ```
 
-Returns `null` if no mapper is registered for the collection.
+Returns `null` if the URI cannot be parsed, no mapper is registered for the collection, or the DID document has no PDS endpoint.
 
 ### `sync(string $uri): ?Model`
 
@@ -107,6 +107,8 @@ $response = $client->atproto->repo->getRecord(
 // Convert to typed DTO
 $record = $helper->hydrateRecord($response);
 ```
+
+Without a `$recordClass` and without a mapper for the collection, `hydrateRecord()` returns the raw `value` array.
 
 ## Practical Examples
 
@@ -209,7 +211,7 @@ class PostImporter
             );
 
             foreach ($response->records as $record) {
-                $post = $this->helper->sync($record->uri);
+                $post = $this->helper->sync($record['uri']);
                 $imported[] = $post;
 
                 if (count($imported) >= $limit) {
@@ -227,7 +229,7 @@ class PostImporter
 
 ## Error Handling
 
-RecordHelper returns `null` for various failure conditions:
+RecordHelper returns `null` for some failure conditions:
 
 ```php
 $helper = app(RecordHelper::class);
@@ -240,15 +242,15 @@ $result = $helper->fetch('not-a-valid-uri');
 $result = $helper->fetchAsModel('at://did:plc:xxx/some.unknown.collection/abc');
 // Returns null
 
-// PDS resolution failed
+// DID could not be resolved
 $result = $helper->fetch('at://did:plc:invalid/app.bsky.feed.post/abc');
-// Returns null (or throws exception depending on resolver config)
+// Throws DidResolutionException (null only when the DID document has no PDS endpoint)
 ```
 
 For more control, catch exceptions:
 
 ```php
-use SocialDept\AtpResolver\Exceptions\DidResolutionException;
+use SocialDept\AtpSupport\Exceptions\DidResolutionException;
 
 try {
     $post = $helper->sync($uri);
@@ -280,7 +282,7 @@ $helper->sync('at://did:plc:xyz/app.bsky.feed.post/1');
 
 ### DID Resolution Caching
 
-atp-resolver caches DID documents and PDS endpoints. Default TTL is 1 hour.
+The atp-support resolver caches DID documents and PDS endpoints. The default TTL is 1 hour (`atp-support.cache.did_ttl` and `atp-support.cache.pds_ttl`, 3600 seconds).
 
 ### Batch Operations
 
@@ -302,11 +304,11 @@ $response = $client->atproto->repo->listRecords(
 
 foreach ($response->records as $record) {
     $recordClass = $mapper->recordClass();
-    $dto = $recordClass::fromArray($record->value);
+    $dto = $recordClass::fromArray($record['value']);
 
     $mapper->upsert($dto, [
-        'uri' => $record->uri,
-        'cid' => $record->cid,
+        'uri' => $record['uri'],
+        'cid' => $record['cid'],
     ]);
 }
 ```
@@ -324,7 +326,7 @@ $client = Atp::as('user.bsky.social');
 
 // Fetch a record that requires auth
 $response = $client->atproto->repo->getRecord(
-    repo: $client->session()->did(),
+    repo: $client->client->session()->did(),
     collection: 'app.bsky.feed.post',
     rkey: 'abc123'
 );

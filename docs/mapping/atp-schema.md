@@ -1,6 +1,6 @@
 # atp-schema Integration
 
-Parity is built on top of atp-schema, using its `Data` base class for all record DTOs. This provides type safety, validation, and compatibility with the AT Protocol ecosystem.
+Part of the [atp-parity docs](../introduction.md#documentation). Using atp-schema's generated DTOs and `Data` base class for records, including custom lexicons, unions and facets.
 
 ## How It Works
 
@@ -34,6 +34,7 @@ This means all Parity records inherit:
 atp-schema generates PHP classes for all AT Protocol lexicons. Use them directly with Parity:
 
 ```php
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\Support\SchemaMapper;
 use SocialDept\AtpSchema\Generated\App\Bsky\Feed\Post;
 use SocialDept\AtpSchema\Generated\App\Bsky\Feed\Like;
@@ -55,6 +56,7 @@ $postMapper = new SchemaMapper(
         'createdAt' => $model->published_at->toIso8601String(),
         'langs' => $model->langs ?? ['en'],
     ],
+    accepts: Acceptance::connectedActors(),
 );
 
 // Like mapper
@@ -73,6 +75,7 @@ $likeMapper = new SchemaMapper(
         ],
         'createdAt' => $model->liked_at->toIso8601String(),
     ],
+    accepts: Acceptance::connectedActors(),
 );
 
 // Follow mapper
@@ -87,8 +90,11 @@ $followMapper = new SchemaMapper(
         'subject' => $model->subject_did,
         'createdAt' => $model->followed_at->toIso8601String(),
     ],
+    accepts: Acceptance::connectedActors(),
 );
 ```
+
+`accepts` is optional, but it defaults to `null`, and a mapper with no acceptance policy imports nothing from the network. See [Record Mappers](mappers.md).
 
 ## Creating Custom Records
 
@@ -199,10 +205,11 @@ class Article extends Record
 atp-schema generates classes for embedded types. Use them in your mappings:
 
 ```php
+use SocialDept\AtpParity\Acceptance\Acceptance;
+use SocialDept\AtpParity\Support\SchemaMapper;
 use SocialDept\AtpSchema\Generated\App\Bsky\Feed\Post;
 use SocialDept\AtpSchema\Generated\App\Bsky\Embed\Images;
 use SocialDept\AtpSchema\Generated\App\Bsky\Embed\External;
-use SocialDept\AtpSchema\Generated\Com\Atproto\Repo\StrongRef;
 
 $mapper = new SchemaMapper(
     schemaClass: Post::class,
@@ -218,6 +225,7 @@ $mapper = new SchemaMapper(
         'text' => $model->content,
         'createdAt' => $model->published_at->toIso8601String(),
     ],
+    accepts: Acceptance::connectedActors(),
 );
 ```
 

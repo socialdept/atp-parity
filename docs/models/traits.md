@@ -1,6 +1,6 @@
 # Model Traits
 
-Parity provides two traits to add AT Protocol awareness to your Eloquent models.
+Part of the [atp-parity docs](../introduction.md#documentation). The `HasAtpRecord` and `SyncsWithAtp` traits, their methods and query scopes.
 
 ## HasAtpRecord
 
@@ -38,9 +38,12 @@ Schema::create('posts', function (Blueprint $table) {
     $table->timestamp('published_at');
     $table->string('atp_uri')->nullable()->unique();
     $table->string('atp_cid')->nullable();
+    $table->timestamp('atp_synced_at')->nullable();
     $table->timestamps();
 });
 ```
+
+The `atp_synced_at` column is needed even with `HasAtpRecord` alone, because the mapper sets it on every model it creates or updates from a record. The `$table->atp()` Blueprint macro adds all three columns, using the names from `atp-parity.columns`.
 
 ### Available Methods
 
@@ -89,9 +92,20 @@ $post->getAtpRkey();
 // "xyz789"
 ```
 
+#### `getDesiredAtpRkey(): ?string`
+
+Returns the rkey to use when the record is first created. The default returns `null`, which lets the PDS generate one. Override it to supply your own rkeys, such as UUIDs or slugs.
+
+```php
+public function getDesiredAtpRkey(): ?string
+{
+    return $this->slug;
+}
+```
+
 #### `hasAtpRecord(): bool`
 
-Checks if the model has been synced to AT Protocol.
+Checks if the model has been synced to AT Protocol, meaning the URI column is not null.
 
 ```php
 if ($post->hasAtpRecord()) {
@@ -101,7 +115,7 @@ if ($post->hasAtpRecord()) {
 
 #### `getAtpMapper(): ?RecordMapper`
 
-Gets the registered mapper for this model class.
+Gets the registered mapper for this model class. When several mappers are registered for the model, it returns the first one that is not a reference mapper, and falls back to the first mapper.
 
 ```php
 $mapper = $post->getAtpMapper();
@@ -109,7 +123,7 @@ $mapper = $post->getAtpMapper();
 
 #### `toAtpRecord(): ?Data`
 
-Converts the model to an AT Protocol record DTO.
+Converts the model to an AT Protocol record DTO. Returns `null` when no mapper is registered for the model.
 
 ```php
 $record = $post->toAtpRecord();
@@ -144,7 +158,7 @@ $post = Post::whereAtpUri('at://did:plc:xxx/app.bsky.feed.post/abc')->first();
 
 ## SyncsWithAtp
 
-Extended trait for bidirectional synchronization tracking. Includes all `HasAtpRecord` functionality plus sync timestamps and conflict detection.
+Extended trait for bidirectional synchronization tracking. It uses `HasAtpRecord`, so it includes all of its methods and scopes, and adds sync timestamp tracking.
 
 ### Setup
 
@@ -193,7 +207,7 @@ Schema::create('posts', function (Blueprint $table) {
 
 #### `getAtpSyncedAtColumn(): string`
 
-Returns the column name for the sync timestamp. Override to customize.
+Returns the column name for the sync timestamp. It returns `'atp_synced_at'` and does not read `atp-parity.columns.synced_at`. Override to customize.
 
 ```php
 public function getAtpSyncedAtColumn(): string
@@ -213,7 +227,7 @@ $syncedAt = $post->getAtpSyncedAt();
 
 #### `markAsSynced(string $uri, string $cid): void`
 
-Marks the model as synced with the given metadata. Does not save.
+Sets the URI and CID columns and sets the sync timestamp to now. Does not save.
 
 ```php
 $post->markAsSynced($uri, $cid);
@@ -230,11 +244,11 @@ if ($post->hasLocalChanges()) {
 }
 ```
 
-This compares `updated_at` with `atp_synced_at`.
+This compares `updated_at` with the sync timestamp. It returns `true` when the model has never been synced, and `false` when `updated_at` is empty.
 
 #### `updateFromRecord(Data $record, string $uri, string $cid): void`
 
-Updates the model from a remote record. Does not save.
+Updates the model from a remote record through its mapper's `updateModel()` and sets the sync timestamp to now. Does nothing when no mapper is registered. Does not save.
 
 ```php
 $post->updateFromRecord($record, $uri, $cid);
@@ -298,10 +312,10 @@ $stats = [
 
 ## Custom Column Names
 
-Both traits respect the global column configuration:
+Both traits read the URI and CID column names from the global column configuration:
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 return [
     'columns' => [
         'uri' => 'at_protocol_uri',
@@ -310,7 +324,7 @@ return [
 ];
 ```
 
-For the sync timestamp column, override the method in your model:
+For the sync timestamp column, the trait does not read `atp-parity.columns.synced_at`, so override the method in your model. The mapper does read that config key, so set both to the same name:
 
 ```php
 class Post extends Model
@@ -326,17 +340,15 @@ class Post extends Model
 
 ## Event Hooks
 
-The `SyncsWithAtp` trait includes a boot method you can extend:
+The `SyncsWithAtp` trait has a `bootSyncsWithAtp()` method, but it registers nothing. Add your own model event listeners in the model's `booted()` method:
 
 ```php
 class Post extends Model
 {
     use SyncsWithAtp;
 
-    protected static function bootSyncsWithAtp(): void
+    protected static function booted(): void
     {
-        parent::bootSyncsWithAtp();
-
         static::updating(function ($model) {
             // Custom logic before updates
         });

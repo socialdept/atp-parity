@@ -1,6 +1,8 @@
 # Blob Handling
 
-Parity provides comprehensive blob handling for AT Protocol images, videos, and other binary content. You can download blobs from the network, upload local files to AT Protocol, and integrate with Spatie MediaLibrary for advanced media management.
+Part of the [atp-parity docs](../introduction.md#documentation). Downloading, uploading and serving blobs, the filesystem and MediaLibrary storage drivers, and `HasAtpBlobs`.
+
+AT Protocol blobs are binary content such as images and videos. You can download them from the network, upload local files to AT Protocol, and store them with the filesystem or Spatie MediaLibrary.
 
 ## Overview
 
@@ -48,14 +50,14 @@ PARITY_BLOB_STORAGE=medialibrary
 #### 1. Run the Migration
 
 ```bash
-php artisan vendor:publish --tag=parity-migrations
+php artisan vendor:publish --tag=parity-migrations-blobs
 php artisan migrate
 ```
 
 #### 2. Configure Blob Storage
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 'blobs' => [
     'storage_driver' => \SocialDept\AtpParity\Enums\BlobStorageDriver::Filesystem,
     'disk' => 'local',
@@ -101,7 +103,7 @@ php artisan migrate
 #### 2. Configure Storage Driver
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 'blobs' => [
     'storage_driver' => \SocialDept\AtpParity\Enums\BlobStorageDriver::MediaLibrary,
 ],
@@ -119,11 +121,12 @@ PARITY_BLOB_STORAGE=medialibrary
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use SocialDept\AtpParity\Concerns\HasAtpRecord;
 use SocialDept\AtpParity\Concerns\InteractsWithMediaLibrary;
 
 class Post extends Model implements HasMedia
 {
-    use InteractsWithMedia, InteractsWithMediaLibrary;
+    use HasAtpRecord, InteractsWithMedia, InteractsWithMediaLibrary;
 
     protected $casts = [
         'atp_blobs' => 'array',
@@ -380,7 +383,7 @@ if ($mapper->hasBlobFields()) {
 Enable automatic blob downloading during record imports:
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 'blobs' => [
     'download_on_import' => true,
 ],
@@ -404,11 +407,12 @@ For advanced media management, integrate with [Spatie MediaLibrary](https://spat
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use SocialDept\AtpParity\Concerns\HasAtpRecord;
 use SocialDept\AtpParity\Concerns\InteractsWithMediaLibrary;
 
 class Profile extends Model implements HasMedia
 {
-    use InteractsWithMedia, InteractsWithMediaLibrary;
+    use HasAtpRecord, InteractsWithMedia, InteractsWithMediaLibrary;
 
     // Map blob fields to MediaLibrary collections
     public function atpBlobToMediaCollections(): array
@@ -466,11 +470,15 @@ if ($profile->hasBlobInCollection($cid, 'avatar')) {
 Full blob configuration options:
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 use SocialDept\AtpParity\Enums\BlobStorageDriver;
 use SocialDept\AtpParity\Enums\BlobUrlStrategy;
 
 'blobs' => [
+    // An invokable implementing Contracts\BlobResolver, or null. Turns a model's
+    // attached file into a blob reference before the record is built
+    'resolver' => null,
+
     // Storage driver: 'filesystem' or 'medialibrary'
     'storage_driver' => BlobStorageDriver::tryFrom(
         env('PARITY_BLOB_STORAGE', 'filesystem')
@@ -511,6 +519,8 @@ use SocialDept\AtpParity\Enums\BlobUrlStrategy;
 | `Cdn` | Uses Bluesky CDN URLs | Production, fastest delivery |
 | `Pds` | Direct PDS getBlob endpoint | Non-Bluesky AT Protocol servers |
 | `Local` | Serves from local storage | Self-hosted, offline access |
+
+With `Local`, a blob that has no local file falls back to the CDN URL.
 
 ## Events
 
@@ -587,6 +597,8 @@ $mapping->deleteLocalFile();
 | downloaded_at | timestamp | When downloaded |
 | uploaded_at | timestamp | When uploaded |
 | source | string | 'remote' or 'local' |
+| created_at | timestamp | Row created |
+| updated_at | timestamp | Row updated |
 
 ## Publishing with Blobs
 
@@ -594,10 +606,10 @@ When publishing records with blobs:
 
 ```php
 use SocialDept\AtpParity\Blob\BlobManager;
-use SocialDept\AtpParity\Publish\PublishService;
+use SocialDept\AtpParity\Sync\SyncService;
 
 $blobManager = app(BlobManager::class);
-$publishService = app(PublishService::class);
+$syncService = app(SyncService::class);
 
 // 1. Upload the image first
 $blobRef = $blobManager->upload($did, $request->file('image'));
@@ -615,8 +627,8 @@ $post = Post::create([
     ],
 ]);
 
-// 3. Publish to AT Protocol
-$result = $publishService->publishAs($did, $post);
+// 3. Sync to AT Protocol
+$result = $syncService->syncAs($did, $post);
 ```
 
 ## Storage Considerations
@@ -635,7 +647,7 @@ For production, consider using cloud storage:
     ],
 ],
 
-// config/parity.php
+// config/atp-parity.php
 'blobs' => [
     'disk' => 'atp-blobs',
 ],
@@ -658,4 +670,4 @@ atp-blobs/
 
 ### Deduplication
 
-Blobs are deduplicated by CID. Uploading the same content twice will reuse the existing mapping.
+Blob mappings are keyed by CID. Downloading a blob that is already stored locally returns the existing mapping without fetching it again. Uploading the same content again still sends it to the PDS, then updates the existing mapping instead of adding a new one.
