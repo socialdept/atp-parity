@@ -1,6 +1,6 @@
 # Automatic Syncing
 
-Parity provides automatic synchronization of Eloquent models with AT Protocol records through the `AutoSyncsWithAtp` trait. When enabled, models are automatically synced to AT Protocol when created, updated, or deleted.
+Part of the [atp-parity docs](../introduction.md#documentation). Syncing models to AT Protocol on create, update and delete with `AutoSyncsWithAtp`, and retrying syncs that failed on an expired session.
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ class Post extends Model
 Auto-sync requires a mapper to know how to convert your model to an AT Protocol record:
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 'mappers' => [
     App\AtpMappers\PostMapper::class,
 ],
@@ -77,7 +77,7 @@ public function shouldAutoSync(): bool
 }
 ```
 
-This method is checked on both `created` and `updated` events.
+This method is checked on both `created` and `updated` events. An update only resyncs a model that already has a record, and when the mapper declares its record columns, only when one of those columns changed.
 
 ### shouldAutoUnsync()
 
@@ -89,6 +89,18 @@ public function shouldAutoUnsync(): bool
     // Keep the AT Protocol record even after local deletion
     return false;
 }
+```
+
+## Unchanged Records Are Skipped
+
+Before writing, an unchanged record is skipped by comparing the CID it would have against the one already stored. Writing an identical record still produces a signed commit and a firehose event on the author's PDS, so this keeps a sync loop from costing them work. Set `PARITY_SYNC_SKIP_UNCHANGED=false` (config `sync.skip_unchanged`) to write unconditionally.
+
+When repairing a repo, pass `force: true` to `SyncService::resync()`. An equal CID proves what was last written, not what the repo still holds:
+
+```php
+use SocialDept\AtpParity\Sync\SyncService;
+
+app(SyncService::class)->resync($post, force: true);
 ```
 
 ## Inbound Records Do Not Sync
@@ -117,14 +129,14 @@ throws.
 
 The following events are dispatched during sync operations:
 
-### RecordPublished
+### RecordSynced
 
-Dispatched when a record is created or updated on AT Protocol.
+Dispatched when a record is created or updated on AT Protocol. It also carries `rev`, the commit revision, and `record`, the value as written. Both are null when the PDS did not report a commit.
 
 ```php
-use SocialDept\AtpParity\Events\RecordPublished;
+use SocialDept\AtpParity\Events\RecordSynced;
 
-Event::listen(RecordPublished::class, function (RecordPublished $event) {
+Event::listen(RecordSynced::class, function (RecordSynced $event) {
     Log::info('Record synced', [
         'model' => get_class($event->model),
         'uri' => $event->uri,
@@ -133,14 +145,14 @@ Event::listen(RecordPublished::class, function (RecordPublished $event) {
 });
 ```
 
-### RecordUnpublished
+### RecordUnsynced
 
-Dispatched when a record is deleted from AT Protocol.
+Dispatched when a record is deleted from AT Protocol. It also carries `rev`, the delete commit revision, or null when the PDS did not report one.
 
 ```php
-use SocialDept\AtpParity\Events\RecordUnpublished;
+use SocialDept\AtpParity\Events\RecordUnsynced;
 
-Event::listen(RecordUnpublished::class, function (RecordUnpublished $event) {
+Event::listen(RecordUnsynced::class, function (RecordUnsynced $event) {
     Log::info('Record removed', [
         'model' => get_class($event->model),
         'uri' => $event->uri,
@@ -242,11 +254,11 @@ class Publication extends Model
 
 ## Trait Hierarchy
 
-`AutoSyncsWithAtp` uses `PublishesRecords` which uses `HasAtpRecord`:
+`AutoSyncsWithAtp` uses `SyncsRecords` which uses `HasAtpRecord`:
 
 ```
 AutoSyncsWithAtp
-  └── PublishesRecords
+  └── SyncsRecords
         └── HasAtpRecord
 ```
 
@@ -257,14 +269,15 @@ $post->hasAtpRecord();      // Check if synced
 $post->getAtpUri();         // Get AT Protocol URI
 $post->getAtpCid();         // Get content ID
 $post->toAtpRecord();       // Convert to Record DTO
-$post->publish();           // Manual publish
-$post->republish();         // Manual update
-$post->unpublish();         // Manual delete
+$post->isSynced();          // Same as hasAtpRecord()
+$post->sync();              // Manual create
+$post->resync();            // Manual update
+$post->unsync();            // Manual delete
 ```
 
 ## Error Handling
 
-By default, sync errors are caught and logged but don't prevent model operations. The model will be saved/updated/deleted locally even if the AT Protocol sync fails.
+By default, sync errors are caught and turned into a failed result, which auto-sync discards. Nothing is logged. The model is still saved, updated or deleted locally when the AT Protocol sync fails. The exception is an expired or invalid session: `AuthenticationException` and `OAuthSessionInvalidException` are rethrown so your app can send the user back through OAuth (see [Pending Syncs](#pending-syncs-retry-after-re-authentication)).
 
 To handle sync errors explicitly, listen to the events or check the `atp_uri` column after save:
 
@@ -290,7 +303,7 @@ PARITY_PENDING_SYNCS_ENABLED=true
 ### Configuration
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 'pending_syncs' => [
     // Enable the feature
     'enabled' => env('PARITY_PENDING_SYNCS_ENABLED', false),
@@ -345,13 +358,14 @@ public function handleOAuthCallback(Request $request)
 
 ### Auto-Retry on Re-Authentication
 
-Enable automatic retry when the `SessionAuthenticated` event fires:
+Enable automatic retry when the `SessionAuthenticated` event fires. Pending syncs must be enabled as well:
 
 ```env
+PARITY_PENDING_SYNCS_ENABLED=true
 PARITY_PENDING_SYNCS_AUTO_RETRY=true
 ```
 
-This registers a listener that automatically retries pending syncs whenever a user successfully authenticates via OAuth.
+This registers a listener that retries pending syncs whenever a user successfully authenticates via OAuth. The retry runs after the HTTP response is sent, so the new tokens are saved first.
 
 ### Events
 
@@ -390,6 +404,7 @@ Event::listen(PendingSyncFailed::class, function ($event) {
 
 ```php
 use SocialDept\AtpParity\Facades\Parity;
+use SocialDept\AtpParity\PendingSync\PendingSyncManager;
 
 // Check if user has pending syncs
 Parity::hasPendingSyncs($did);
@@ -408,29 +423,31 @@ $pending = app(PendingSyncManager::class)->forDid($did);
 3. The auth exception is re-thrown (so your app can redirect to OAuth)
 4. User re-authenticates via OAuth
 5. Pending syncs are retried (manually or automatically)
-6. Successful syncs are removed; failed syncs remain for next attempt
+6. Successful syncs are removed. Failed syncs remain for the next attempt
 
 ### Edge Cases
 
 - **Deleted models:** If a model is deleted before retry, the pending sync is considered "handled" and removed
-- **Max attempts:** After exceeding `max_attempts`, the pending sync is discarded
-- **TTL expiry:** Expired pending syncs are cleaned up (call `Parity::cleanupPendingSyncs()` periodically or use database storage which handles this automatically)
+- **Max attempts:** Once a pending sync has been tried `max_attempts` times, the next retry discards it
+- **TTL expiry:** Cache storage expires entries on its own after `ttl`. Database storage does not, so call `app(PendingSyncManager::class)->cleanup()` periodically to delete expired rows
 - **Auth still invalid:** If retry fails with another auth exception, it bubbles up for another re-auth cycle
 
 ## Manual Sync
 
-You can also trigger sync manually using methods from `PublishesRecords`:
+You can also trigger sync manually using methods from `SyncsRecords`:
 
 ```php
-// Manual publish (uses syncAsDid())
-$post->publish();
+// Create the record (or update it if it exists), as the DID from a `did` column or a `user` or `author` relationship
+$post->sync();
 
-// Publish as specific DID
-$post->publishAs('did:plc:xxx');
+// Create as a specific DID
+$post->syncAs('did:plc:xxx');
 
-// Update existing record
-$post->republish();
+// Update the existing record
+$post->resync();
 
 // Remove from AT Protocol
-$post->unpublish();
+$post->unsync();
 ```
+
+`sync()`, `syncAs()` and `resync()` return a `SyncResult`, and `unsync()` returns a bool. `sync()` does not call `syncAsDid()`.

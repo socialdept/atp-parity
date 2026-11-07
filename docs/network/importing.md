@@ -1,6 +1,8 @@
 # Importing Records
 
-Parity includes a comprehensive import system that enables you to sync historical AT Protocol data to your Eloquent models. This complements the real-time sync provided by [ParitySignal](atp-signals-integration.md).
+Part of the [atp-parity docs](../introduction.md#documentation). Importing a repo's existing records, from the command line or in code, and tracking import state.
+
+This complements the real-time sync provided by [ParitySignal](atp-signals.md).
 
 ## The Cold Start Problem
 
@@ -236,7 +238,7 @@ Event::listen(ImportFailed::class, function (ImportFailed $event) {
 
 ## Configuration
 
-Configure importing in `config/parity.php`:
+Configure importing in `config/atp-parity.php`:
 
 ```php
 'import' => [
@@ -247,7 +249,7 @@ Configure importing in `config/parity.php`:
     'page_delay' => 100,
 
     // Queue name for import jobs
-    'queue' => 'parity-import',
+    'queue' => 'default',
 
     // Database table for storing import state
     'state_table' => 'parity_import_states',
@@ -307,7 +309,8 @@ The `page_delay` config option helps prevent overwhelming PDS servers. For bulk 
 Imports can fail due to:
 - Network errors
 - PDS rate limiting
-- Invalid records
+
+A single record that fails to build or save does not fail the import. It is counted in `records_failed` and the import moves on.
 
 The system automatically tracks progress via cursor, allowing you to resume failed imports:
 

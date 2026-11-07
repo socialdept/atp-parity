@@ -1,6 +1,6 @@
 # atp-signals Integration
 
-Parity integrates with atp-signals to automatically sync firehose events to your Eloquent models in real-time. The `ParitySignal` class handles create, update, and delete operations for all registered mappers.
+Part of the [atp-parity docs](../introduction.md#documentation). Syncing firehose and Jetstream events into your models with `ParitySignal`, or applying records from another transport with `RecordApplier`.
 
 ## ParitySignal
 
@@ -19,7 +19,7 @@ The `ParitySignal` is a pre-built signal that listens for commit events and sync
 Register the signal in your atp-signals config:
 
 ```php
-// config/signal.php
+// config/atp-signals.php
 return [
     'signals' => [
         \SocialDept\AtpParity\Signals\ParitySignal::class,
@@ -40,7 +40,7 @@ That's it. Your models will automatically sync with the firehose.
 ParitySignal only syncs collections that have registered mappers:
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 return [
     'mappers' => [
         App\AtpMappers\PostMapper::class,    // app.bsky.feed.post
@@ -197,7 +197,7 @@ class PostMapper extends RecordMapper
 ### 4. Register Everything
 
 ```php
-// config/parity.php
+// config/atp-parity.php
 return [
     'mappers' => [
         App\AtpMappers\PostMapper::class,
@@ -206,7 +206,7 @@ return [
 ```
 
 ```php
-// config/signal.php
+// config/atp-signals.php
 return [
     'signals' => [
         \SocialDept\AtpParity\Signals\ParitySignal::class,
@@ -257,7 +257,7 @@ class FilteredParitySignal extends ParitySignal
 Register your custom signal instead:
 
 ```php
-// config/signal.php
+// config/atp-signals.php
 return [
     'signals' => [
         App\Signals\FilteredParitySignal::class,
@@ -358,7 +358,7 @@ php artisan queue:work --queue=parity-sync
 You can run ParitySignal alongside other signals:
 
 ```php
-// config/signal.php
+// config/atp-signals.php
 return [
     'signals' => [
         // Sync to database
@@ -379,21 +379,16 @@ The AT Protocol firehose processes thousands of events per second. For productio
 
 ### 1. Use Jetstream Mode
 
-Jetstream filters server-side, reducing bandwidth:
+Jetstream filters server-side, reducing bandwidth. It is the default mode:
 
 ```php
-// config/signal.php
+// config/atp-signals.php
 return [
-    'mode' => 'jetstream', // More efficient than firehose
-
-    'jetstream' => [
-        'collections' => [
-            'app.bsky.feed.post',
-            'app.bsky.feed.like',
-        ],
-    ],
+    'mode' => env('SIGNAL_MODE', 'jetstream'), // More efficient than firehose
 ];
 ```
+
+There is no separate collection list to configure. The Jetstream consumer asks for the collections your signals return from `collections()`, and `ParitySignal` returns the lexicons of your registered mappers.
 
 ### 2. Enable Queues
 
@@ -491,7 +486,7 @@ atp-signals handles cursor persistence automatically. If the consumer restarts, 
 To reset and start fresh:
 
 ```bash
-php artisan signal:consume --reset
+php artisan signal:consume --fresh
 ```
 
 ## Testing

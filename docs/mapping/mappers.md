@@ -1,6 +1,8 @@
 # Record Mappers
 
-Mappers are the core of atp-parity. They define bidirectional transformations between AT Protocol record DTOs and Eloquent models.
+Part of the [atp-parity docs](../introduction.md#documentation). Writing a `RecordMapper`, the methods it inherits, registering it and using the registry.
+
+Mappers are the core of atp-parity. They define the transformation in both directions between AT Protocol record DTOs and Eloquent models.
 
 ## Creating a Mapper
 
@@ -13,6 +15,7 @@ namespace App\AtpMappers;
 
 use App\Models\Post;
 use Illuminate\Database\Eloquent\Model;
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\RecordMapper;
 use SocialDept\AtpSchema\Data\Data;
 use SocialDept\AtpSchema\Generated\App\Bsky\Feed\Post as PostRecord;
@@ -36,6 +39,14 @@ class PostMapper extends RecordMapper
     public function modelClass(): string
     {
         return Post::class;
+    }
+
+    /**
+     * Which records this mapper accepts from the network.
+     */
+    public function accepts(): ?Acceptance
+    {
+        return Acceptance::connectedActors();
     }
 
     /**
@@ -80,19 +91,23 @@ Returns the fully qualified class name of the AT Protocol record DTO. This can b
 
 Returns the fully qualified class name of the Eloquent model.
 
-### `recordToAttributes(Data $record): array`
+### `recordToAttributes(Data $record): array` and `modelToRecordData(Model $model): array`
 
-Transforms an AT Protocol record into an array of Eloquent model attributes. This is used when:
+Both are protected. Override them, or declare `fields()` instead and let the base class build both directions from the field map (see [Fields](fields.md)). A mapper that does neither throws a `LogicException` the first time either direction runs.
+
+`recordToAttributes()` transforms an AT Protocol record into an array of Eloquent model attributes. This is used when:
 
 - Creating a new model from a remote record
 - Updating an existing model from a remote record
 
-### `modelToRecordData(Model $model): array`
-
-Transforms an Eloquent model into an array suitable for creating an AT Protocol record. This is used when:
+`modelToRecordData()` transforms an Eloquent model into an array suitable for creating an AT Protocol record. This is used when:
 
 - Publishing a local model to the AT Protocol network
 - Comparing local and remote state
+
+### `accepts(): ?Acceptance`
+
+Says which records the mapper accepts from the network. The base class returns `null`, and `shouldImport()` refuses every record when `accepts()` is `null`, so a mapper that does not override it imports nothing. `SocialDept\AtpParity\Acceptance\Acceptance` offers `anything()`, `none()`, `connectedActors()`, `knownActors()` and `when(callable)`, combined with `and()` and `or()`. `connectedActors()` and `knownActors()` need the `atp-parity.acceptance.is_connected_actor` and `atp-parity.acceptance.is_known_actor` config lookups, and accept nothing while those are unset.
 
 ## Inherited Methods
 
@@ -100,7 +115,7 @@ The abstract `RecordMapper` class provides these methods:
 
 ### `lexicon(): string`
 
-Returns the lexicon NSID (e.g., `app.bsky.feed.post`). Automatically derived from the record class's `getLexicon()` method.
+Returns the lexicon NSID (e.g., `app.bsky.feed.post`). Taken from a `#[Lexicon('...')]` attribute on the mapper class (`SocialDept\AtpParity\Attributes\Lexicon`) when present, otherwise from the record class's `getLexicon()` method.
 
 ### `toModel(Data $record, array $meta = []): Model`
 
@@ -140,9 +155,9 @@ Finds a model by its AT Protocol URI.
 $post = $mapper->findByUri('at://did:plc:xxx/app.bsky.feed.post/abc123');
 ```
 
-### `upsert(Data $record, array $meta = []): Model`
+### `upsert(Data $record, array $meta = []): ?Model`
 
-Creates or updates a model based on the URI. This is the primary method used for syncing.
+Creates or updates a model based on the URI, and saves it. This is the primary method used for syncing. It returns `null` without writing anything when `shouldImport()` refuses the record.
 
 ```php
 $post = $mapper->upsert($record, [
@@ -167,8 +182,11 @@ The `$meta` array passed to `toModel`, `updateModel`, and `upsert` can contain:
 |-----|-------------|
 | `uri` | The AT Protocol URI (e.g., `at://did:plc:xxx/app.bsky.feed.post/abc123`) |
 | `cid` | The content identifier hash |
+| `rkey` | The record key. Stored only when an rkey column is configured |
+| `did` | The DID of the repo the record came from |
+| `backfill` | `true` when the record is a historical replay rather than a live commit |
 
-These are automatically mapped to your configured column names (default: `atp_uri`, `atp_cid`).
+The sync paths fill these in. `uri`, `cid` and `rkey` are written to your configured column names (default: `atp_uri`, `atp_cid`, and no rkey column). `toModel()` and `updateModel()` also set the synced-at column (default `atp_synced_at`) to the current time.
 
 ## Customizing Column Names
 
@@ -187,16 +205,28 @@ class PostMapper extends RecordMapper
         return 'at_cid'; // Instead of default 'atp_cid'
     }
 
+    protected function syncedAtColumn(): string
+    {
+        return 'at_synced_at'; // Instead of default 'atp_synced_at'
+    }
+
+    protected function rkeyColumn(): ?string
+    {
+        return 'rkey'; // Default null: the rkey is not stored
+    }
+
     // ... other methods
 }
 ```
 
-Or configure globally in `config/parity.php`:
+Or configure globally in `config/atp-parity.php`:
 
 ```php
 'columns' => [
     'uri' => 'at_uri',
     'cid' => 'at_cid',
+    'synced_at' => 'at_synced_at',
+    'rkey' => 'rkey',
 ],
 ```
 
@@ -204,7 +234,7 @@ Or configure globally in `config/parity.php`:
 
 ### Via Configuration
 
-Add your mapper classes to `config/parity.php`:
+Add your mapper classes to `config/atp-parity.php`:
 
 ```php
 return [
@@ -239,15 +269,24 @@ $registry = app(MapperRegistry::class);
 // Find mapper by record class
 $mapper = $registry->forRecord(PostRecord::class);
 
-// Find mapper by model class
+// Find the first mapper registered for a model class
 $mapper = $registry->forModel(Post::class);
+
+// Find every mapper registered for a model class
+$mappers = $registry->forModelAll(Post::class);
 
 // Find mapper by lexicon NSID
 $mapper = $registry->forLexicon('app.bsky.feed.post');
 
+// Check whether a lexicon has a mapper
+$registry->hasLexicon('app.bsky.feed.post');
+
 // Get all registered lexicons
 $lexicons = $registry->lexicons();
 // ['app.bsky.feed.post', 'app.bsky.actor.profile', ...]
+
+// Get all registered mappers, one per lexicon
+$mappers = $registry->all();
 ```
 
 ## SchemaMapper for Quick Setup
@@ -255,6 +294,7 @@ $lexicons = $registry->lexicons();
 For simple mappings, use `SchemaMapper` instead of creating a full class:
 
 ```php
+use SocialDept\AtpParity\Acceptance\Acceptance;
 use SocialDept\AtpParity\Support\SchemaMapper;
 use SocialDept\AtpSchema\Generated\App\Bsky\Feed\Like;
 
@@ -273,10 +313,13 @@ $mapper = new SchemaMapper(
         ],
         'createdAt' => $model->liked_at->toIso8601String(),
     ],
+    accepts: Acceptance::connectedActors(),
 );
 
 $registry->register($mapper);
 ```
+
+`accepts` is optional and defaults to `null`, which accepts nothing.
 
 ## Handling Complex Records
 
@@ -372,4 +415,4 @@ class FeedPostMapper extends RecordMapper
 }
 ```
 
-Note: The registry will return the first registered mapper for a given lexicon. Use explicit mapper instances when you need specific behavior.
+Note: the registry keeps one mapper per record class and one per lexicon, so for both of these `forRecord()` and `forLexicon()` return the mapper registered last. `forModel()` returns the first mapper registered for that model, and `forModelAll()` returns all of them. Use explicit mapper instances when you need specific behavior.
