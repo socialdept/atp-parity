@@ -72,12 +72,22 @@ class SyncService
             $collection = $mapper->lexicon();
 
             $client = Atp::as($did);
-            $response = $client->atproto->repo->createRecord(
-                collection: $collection,
-                record: $record->toArray(),
-                rkey: method_exists($model, 'getDesiredAtpRkey') ? $model->getDesiredAtpRkey() : null,
-                validate: config('atp-parity.sync.validate', true),
-            );
+            $rkey = method_exists($model, 'getDesiredAtpRkey') ? $model->getDesiredAtpRkey() : null;
+
+            // INFO: a fixed rkey is put, not created, so a retry after a write the PDS saved but never confirmed
+            // overwrites that record instead of failing on it forever.
+            $response = $rkey === null
+                ? $client->atproto->repo->createRecord(
+                    collection: $collection,
+                    record: $record->toRecord(),
+                    validate: config('atp-parity.sync.validate', true),
+                )
+                : $client->atproto->repo->putRecord(
+                    collection: $collection,
+                    rkey: $rkey,
+                    record: $record->toRecord(),
+                    validate: config('atp-parity.sync.validate', true),
+                );
 
             // Update model with ATP metadata
             $this->updateModelMeta($model, $response->uri, $response->cid);
@@ -156,7 +166,7 @@ class SyncService
             $response = $client->atproto->repo->putRecord(
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
-                record: $record->toArray(),
+                record: $record->toRecord(),
                 validate: config('atp-parity.sync.validate', true),
             );
 

@@ -2,6 +2,21 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.3.1
+
+### Fixed
+- **Every write sends the record's `$type`.** The data model requires it. The
+  reference PDS fills it in when it is missing, so the omission went unnoticed,
+  but other PDS implementations refuse the write with "Record $type must match
+  its collection", and nothing synced to them.
+- **A first write with a fixed rkey is put, not created.** When a model returns
+  an rkey from `getDesiredAtpRkey()` or `getDesiredAtpReferenceRkey()`, the first
+  write now uses `putRecord`. If a PDS saved a record but its reply never
+  arrived, the model kept no URI, and every later sync failed because the record
+  already existed. The retry now overwrites it and the model recovers. Under
+  granular OAuth scopes this write needs `update` on the collection as well as
+  `create`.
+
 ## v1.3.0
 
 ### Added
