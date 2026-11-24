@@ -96,6 +96,8 @@ $post->getAtpRkey();
 
 Returns the rkey to use when the record is first created. The default returns `null`, which lets the PDS generate one. Override it to supply your own rkeys, such as UUIDs or slugs.
 
+With an rkey set, the first write uses `putRecord` instead of `createRecord`. A retry after a write the PDS saved but never confirmed then overwrites that record rather than failing on it. `getDesiredAtpReferenceRkey()` does the same for a reference record. Under granular OAuth scopes the session needs both `create` and `update` on the collection.
+
 ```php
 public function getDesiredAtpRkey(): ?string
 {

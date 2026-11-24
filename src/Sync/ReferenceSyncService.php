@@ -129,12 +129,22 @@ class ReferenceSyncService
             $collection = $mapper->lexicon();
 
             $client = Atp::as($did);
-            $response = $client->atproto->repo->createRecord(
-                collection: $collection,
-                record: $record->toRecord(),
-                rkey: method_exists($model, 'getDesiredAtpReferenceRkey') ? $model->getDesiredAtpReferenceRkey() : null,
-                validate: config('atp-parity.sync.validate', true),
-            );
+            $rkey = method_exists($model, 'getDesiredAtpReferenceRkey') ? $model->getDesiredAtpReferenceRkey() : null;
+
+            // INFO: a fixed rkey is put, not created, so a retry after a write the PDS saved but never confirmed
+            // overwrites that record instead of failing on it forever.
+            $response = $rkey === null
+                ? $client->atproto->repo->createRecord(
+                    collection: $collection,
+                    record: $record->toRecord(),
+                    validate: config('atp-parity.sync.validate', true),
+                )
+                : $client->atproto->repo->putRecord(
+                    collection: $collection,
+                    rkey: $rkey,
+                    record: $record->toRecord(),
+                    validate: config('atp-parity.sync.validate', true),
+                );
 
             // Update model with reference record metadata
             $this->updateReferenceModelMeta($model, $mapper, $response->uri, $response->cid);
