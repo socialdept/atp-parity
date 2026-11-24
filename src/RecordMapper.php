@@ -224,6 +224,9 @@ abstract class RecordMapper implements RecordMapperContract
      * rather than failing, since a mapper may adopt a declaration before the app
      * wires resolution up.
      *
+     * Keyed by record shape, so a dotted path such as `media.image` arrives nested
+     * under `media` and merges beside that object's other properties.
+     *
      * @return array<string, mixed>
      */
     protected function resolveBlobs(Model $model): array
@@ -247,7 +250,7 @@ abstract class RecordMapper implements RecordMapperContract
             $reference = $resolver->resolve($model, $path);
 
             if ($reference !== null) {
-                $resolved[$path] = $reference;
+                Arr::set($resolved, $path, $reference);
             }
         }
 

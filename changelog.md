@@ -2,6 +2,16 @@
 
 All notable changes to `atp-parity` will be documented in this file.
 
+## v1.3.2
+
+### Fixed
+- **A blob at a nested path lands nested in the record.** A blob field declared
+  at a dotted path such as `media.image` was merged into the record under the
+  literal key `"media.image"`, which no record shape declares, so the blob never
+  reached the write. Resolved blobs are now placed at their nested position,
+  beside the other properties of the same object. A mapper overriding
+  `resolveBlobs()` now receives nested arrays rather than dotted keys.
+
 ## v1.3.1
 
 ### Fixed
