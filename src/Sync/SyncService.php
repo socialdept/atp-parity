@@ -74,7 +74,7 @@ class SyncService
             $client = Atp::as($did);
             $response = $client->atproto->repo->createRecord(
                 collection: $collection,
-                record: $record->toArray(),
+                record: $record->toRecord(),
                 rkey: method_exists($model, 'getDesiredAtpRkey') ? $model->getDesiredAtpRkey() : null,
                 validate: config('atp-parity.sync.validate', true),
             );
@@ -156,7 +156,7 @@ class SyncService
             $response = $client->atproto->repo->putRecord(
                 collection: $parts['collection'],
                 rkey: $parts['rkey'],
-                record: $record->toArray(),
+                record: $record->toRecord(),
                 validate: config('atp-parity.sync.validate', true),
             );
 
