@@ -5,6 +5,7 @@ namespace SocialDept\AtpParity\Tests\Unit\Blob;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Http;
 use SocialDept\AtpParity\Contracts\BlobResolver;
+use SocialDept\AtpParity\Fields\Field;
 use SocialDept\AtpParity\Tests\Fixtures\BlobMapper;
 use SocialDept\AtpParity\Tests\Fixtures\TestModel;
 use SocialDept\AtpParity\Tests\TestCase;
@@ -43,6 +44,37 @@ class BlobResolutionTest extends TestCase
         $record = (new BlobMapper())->toRecord(new TestModel(['content' => 'hello']))->toArray();
 
         $this->assertSame('bafkreiStub', $record['payload']['ref']['$link']);
+    }
+
+    /**
+     * A blob declared at a dotted path lands nested in the record.
+     *
+     * Resolved blobs were keyed by the full path, so `media.image` arrived as a
+     * root property named "media.image" that no record shape declares, and the blob
+     * was dropped from the write. The sibling under the same parent proves the blob
+     * merges into that object rather than replacing it.
+     */
+    public function test_a_blob_at_a_nested_path_lands_nested_in_the_record(): void
+    {
+        Http::fake();
+        config(['atp-parity.blobs.resolver' => $this->resolver()]);
+
+        $mapper = new class () extends BlobMapper {
+            public function fields(): array
+            {
+                return [
+                    'text' => 'content',
+                    'media.alt' => 'content',
+                    'media.image' => Field::derived(fn () => null)->blob(),
+                ];
+            }
+        };
+
+        $record = $mapper->toRecord(new TestModel(['content' => 'hello']))->toArray();
+
+        $this->assertSame('bafkreiStub', $record['media']['image']['ref']['$link']);
+        $this->assertSame('hello', $record['media']['alt']);
+        $this->assertArrayNotHasKey('media.image', $record);
     }
 
     /**

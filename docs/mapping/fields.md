@@ -31,7 +31,7 @@ A plain string names a column directly. A field is built with `Field::for($colum
 | `codec(string $codec)` | Delegates both directions to a class implementing `SocialDept\AtpParity\Contracts\RecordCodec`, which has `get()` and `set()`. |
 | `enum(string $enum)` | Casts the record value to a backed enum on import, and the enum back to its value on write. |
 | `lossy(bool $lossy = true)` | Marks a field whose round trip is not exact, so the parity assertions skip it. |
-| `blob(bool $blob = true)` | Marks a blob field. Its reference comes from the resolver set in `blobs.resolver`, and without one the field is left out of the record. |
+| `blob(bool $blob = true)` | Marks a blob field. Its reference comes from the resolver set in `blobs.resolver`, and without one the field is left out of the record. A dotted path such as `media.image` places the blob inside that object, beside its other properties. |
 | `importOnly(bool $importOnly = true)` | Read from the record but never written to it. |
 | `reads(string ...$columns)` | Names the other columns a `set` closure reads, so a change to them counts as a change to the record. |
 | `overflowsToBlob(...)` | Moves the value to a blob once the record grows too large. See below. |

@@ -8,10 +8,12 @@ class BlobRecord extends Data
 {
     /**
      * @param  array<string, mixed>|null  $payload
+     * @param  array<string, mixed>|null  $media
      */
     public function __construct(
         public readonly ?string $text = null,
         public readonly ?array $payload = null,
+        public readonly ?array $media = null,
     ) {
     }
 
@@ -25,6 +27,7 @@ class BlobRecord extends Data
         return new static(
             text: $data['text'] ?? null,
             payload: $data['payload'] ?? null,
+            media: $data['media'] ?? null,
         );
     }
 
@@ -33,6 +36,7 @@ class BlobRecord extends Data
         return array_filter([
             'text' => $this->text,
             'payload' => $this->payload,
+            'media' => $this->media,
         ], fn ($v) => $v !== null);
     }
 }
